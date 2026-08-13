@@ -6,6 +6,7 @@ import { requireOwnership } from '../server/auth.js'
 import { validateUpload } from '../server/storage.js'
 import { productSchema, quoteRequestSchema, validate } from '../server/validation.js'
 import { createMemoryRateLimiter } from '../server/handler.js'
+import { createDatabaseClient } from '../server/db.js'
 
 const silentLogger = { info() {}, error() {} }
 const request = (path, options) => new Request(`https://api.motion.test${path}`, options)
@@ -17,6 +18,17 @@ describe('backend access and input rules', () => {
     const api = createApi({ db, logger: silentLogger })
     const result = await responseBody(await api(request('/api/products')))
     expect(result.status).toBe(200); expect(result.data).toEqual([{ slug: 'banner', name: 'Banner' }])
+  })
+
+  it('uses the current Neon parameterized query API and transaction query API', async () => {
+    const calls = []
+    const fakeSql = () => { throw new Error('Tagged templates are not used for parameterized statements.') }
+    fakeSql.query = async (statement, parameters) => { calls.push({ statement, parameters }); return [{ ok: true }] }
+    fakeSql.transaction = async (build) => build({ query: (statement, parameters) => ({ statement, parameters }) })
+    const db = createDatabaseClient(fakeSql)
+    await expect(db.query('SELECT $1', ['value'])).resolves.toEqual([{ ok: true }])
+    await expect(db.transaction((transaction) => [transaction.query('UPDATE example SET value=$1', ['value'])])).resolves.toEqual([{ statement: 'UPDATE example SET value=$1', parameters: ['value'] }])
+    expect(calls).toEqual([{ statement: 'SELECT $1', parameters: ['value'] }])
   })
 
   it('rejects customer access to another customer resource', () => {

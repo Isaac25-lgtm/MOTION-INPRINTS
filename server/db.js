@@ -1,7 +1,9 @@
 import { neon } from '@neondatabase/serverless'
 import { serverConfig } from './config.js'
 export function createDatabase(config = serverConfig()) {
-  const sql = neon(config.databaseUrl)
+  return createDatabaseClient(neon(config.databaseUrl))
+}
+export function createDatabaseClient(sql) {
   return {
     query: (statement, parameters = []) => sql.query(statement, parameters),
     transaction: async (buildQueries, options = {}) => {
