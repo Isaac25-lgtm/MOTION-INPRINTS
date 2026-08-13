@@ -20,6 +20,7 @@
 ## REMAINING
 
 - Provision Neon Auth, configure its issuer/JWKS values, and deploy the secure `server/index.js` handler.
+- Add the official `@neondatabase/auth` React client and its session/token bridge once the package registry is reachable, then replace the intentionally anonymous placeholder in `src/auth/AuthProvider.jsx`. This must be verified against a provisioned Neon Auth project; it cannot be tested with dummy credentials.
 - Apply migrations to a Neon development branch, then test with real Neon Auth tokens.
 - Implement the approved object-storage provider in `server/storage.js`; Neon documentation currently describes storage integrations rather than a customer-facing Neon Object Storage service.
 - Deploy the secure API handler to the approved server runtime and configure its real absolute API URL in Render. A Render Static Site cannot host it.
