@@ -1,7 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import { AdminLayout, CustomerLayout, PublicLayout } from './layouts/Layouts'
 import { RequireAdmin, RequireAuth } from './auth/RouteGuards'
-import { PlaceholderPage } from './pages/PlaceholderPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { HomePage } from './pages/HomePage'
 import { ShopPage, ProductDetailPage } from './pages/ShopPage'
@@ -16,26 +15,55 @@ import { CheckoutPage, OrderConfirmedPage } from './pages/CheckoutPage'
 import { QuoteViewPage } from './pages/QuoteViewPage'
 import { AccountQuotesPage } from './pages/AccountQuotesPage'
 import { StylePreviewPage } from './pages/StylePreviewPage'
+import {
+  AccountOverviewPage, AccountOrdersPage, AccountOrderDetailPage,
+  AccountReorderPage, AccountProfilePage,
+} from './pages/account/AccountPages'
+import {
+  AdminDashboardPage, AdminOrdersPage, AdminOrderDetailPage,
+  AdminCustomersPage, AdminCustomerDetailPage, AdminReportsPage, AdminSectionPage,
+} from './pages/admin/AdminPages'
+import { adminService } from './services/adminService'
+import { TrackOrderPage } from './pages/TrackOrderPage'
+import { SignInPage, SignUpPage, ResetPasswordPage } from './pages/AuthPages'
+import { AdminContentPage, AdminFilesPage, AdminSettingsPage } from './pages/admin/AdminManagePages'
+import { AdminProductFormPage, AdminCategoryFormPage, AdminProjectFormPage } from './pages/admin/AdminForms'
 
-/* Routes still awaiting their own phase keep the placeholder page. */
-const publicPlaceholders = [
-  ['/track-order', 'Track order'],
-]
 /* Legal pages render owner-published CMS content, or say plainly that it has not
    been published. Registered so the footer's links resolve rather than 404. */
 const legalRoutes = [
   ['/privacy', 'Privacy policy', 'privacy'],
   ['/terms', 'Terms and conditions', 'terms'],
 ]
-const customerRoutes = [
-  ['/account', 'Account'], ['/account/orders', 'Orders'], ['/account/orders/:id', 'Order'],
-  ['/account/profile', 'Profile'],
-]
-const adminRoutes = [
-  ['/admin', 'Dashboard'], ['/admin/products', 'Products'], ['/admin/categories', 'Categories'],
-  ['/admin/orders', 'Orders'], ['/admin/quotes', 'Quotes'], ['/admin/customers', 'Customers'],
-  ['/admin/projects', 'Projects'], ['/admin/content', 'Content'], ['/admin/files', 'Files'],
-  ['/admin/settings', 'Settings'],
+/* Admin sections that are list views over an existing service. Kept declarative
+   so each one is a data description rather than another near-identical page. */
+const adminSections = [
+  {
+    path: '/admin/products', title: 'Products', description: 'Catalogue and pricing.',
+    load: (options) => adminService.products({ limit: 100 }, options),
+    columns: [{ key: 'name', label: 'Name' }, { key: 'slug', label: 'Slug' }, { key: 'status', label: 'Status' }],
+    newPath: '/admin/products/new', editPath: (row) => `/admin/products/${row.id}/edit`,
+  },
+  {
+    path: '/admin/categories', title: 'Categories', description: 'Service taxonomy and shop structure.',
+    load: (options) => adminService.categories(options),
+    columns: [{ key: 'name', label: 'Name' }, { key: 'slug', label: 'Slug' },
+      { key: 'is_published', label: 'Published', render: (row) => (row.is_published ? 'Yes' : 'No') }],
+    newPath: '/admin/categories/new', editPath: (row) => `/admin/categories/${row.id}/edit`,
+  },
+  {
+    path: '/admin/quotes', title: 'Quotes', description: 'Quotation pipeline.',
+    load: (options) => adminService.quotes({ limit: 100 }, options),
+    columns: [{ key: 'request_number', label: 'Reference' }, { key: 'contact_name', label: 'Customer' },
+      { key: 'status_code', label: 'Status' }],
+  },
+  {
+    path: '/admin/projects', title: 'Work', description: 'Portfolio projects.',
+    load: (options) => adminService.projects({ limit: 100 }, options),
+    columns: [{ key: 'title', label: 'Title' }, { key: 'slug', label: 'Slug' },
+      { key: 'is_published', label: 'Published', render: (row) => (row.is_published ? 'Yes' : 'No') }],
+    newPath: '/admin/projects/new', editPath: (row) => `/admin/projects/${row.id}/edit`,
+  },
 ]
 
 export function App() {
@@ -58,9 +86,10 @@ export function App() {
         <Route path="/quote" element={<CustomProjectPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        {publicPlaceholders.map(([path, title]) => (
-          <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
-        ))}
+        <Route path="/track-order" element={<TrackOrderPage />} />
+        <Route path="/sign-in" element={<SignInPage />} />
+        <Route path="/sign-up" element={<SignUpPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         {legalRoutes.map(([path, title, section]) => (
           <Route key={path} path={path} element={<LegalPage title={title} section={section} />} />
         ))}
@@ -69,17 +98,47 @@ export function App() {
       </Route>
 
       <Route element={<RequireAuth><CustomerLayout /></RequireAuth>}>
+        <Route path="/account" element={<AccountOverviewPage />} />
+        <Route path="/account/orders" element={<AccountOrdersPage />} />
+        <Route path="/account/orders/:id" element={<AccountOrderDetailPage />} />
+        <Route path="/account/orders/:id/reorder" element={<AccountReorderPage />} />
         <Route path="/account/quotes" element={<AccountQuotesPage />} />
         <Route path="/account/quotes/:id" element={<QuoteViewPage account />} />
-        {customerRoutes.map(([path, title]) => (
-          <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
-        ))}
+        <Route path="/account/profile" element={<AccountProfilePage />} />
       </Route>
 
       <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
-        {adminRoutes.map(([path, title]) => (
-          <Route key={path} path={path} element={<PlaceholderPage title={`Admin: ${title}`} />} />
+        <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route path="/admin/orders" element={<AdminOrdersPage />} />
+        <Route path="/admin/orders/:id" element={<AdminOrderDetailPage />} />
+        <Route path="/admin/customers" element={<AdminCustomersPage />} />
+        <Route path="/admin/customers/:id" element={<AdminCustomerDetailPage />} />
+        <Route path="/admin/reports" element={<AdminReportsPage />} />
+        {adminSections.map(section => (
+          <Route
+            key={section.path}
+            path={section.path}
+            element={(
+              <AdminSectionPage
+                title={section.title}
+                description={section.description}
+                load={section.load}
+                columns={section.columns}
+                newPath={section.newPath}
+                editPath={section.editPath}
+              />
+            )}
+          />
         ))}
+        <Route path="/admin/products/new" element={<AdminProductFormPage />} />
+        <Route path="/admin/products/:id/edit" element={<AdminProductFormPage />} />
+        <Route path="/admin/categories/new" element={<AdminCategoryFormPage />} />
+        <Route path="/admin/categories/:id/edit" element={<AdminCategoryFormPage />} />
+        <Route path="/admin/projects/new" element={<AdminProjectFormPage />} />
+        <Route path="/admin/projects/:id/edit" element={<AdminProjectFormPage />} />
+        <Route path="/admin/content" element={<AdminContentPage />} />
+        <Route path="/admin/files" element={<AdminFilesPage />} />
+        <Route path="/admin/settings" element={<AdminSettingsPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

@@ -7,6 +7,7 @@ import { IconButton } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { useSiteContent, useContactDetails } from '../content/SiteContentProvider'
 import { useCart } from '../features/cart/CartProvider'
+import { useAuth } from '../auth/AuthProvider'
 
 export const primaryNav = [
   { to: '/shop', label: 'Shop' },
@@ -34,7 +35,7 @@ function Announcement() {
 
 /* Mobile navigation is composed rather than stacked: primary sections set large
    with travelling arrows, then account, cart and direct contact beneath a rule. */
-function MobileNav({ open, onClose, cartCount }) {
+function MobileNav({ open, onClose, cartCount, isAuthenticated }) {
   const { phone, whatsapp } = useContactDetails()
   return (
     <Drawer open={open} onClose={onClose} title="Menu" side="end">
@@ -48,7 +49,7 @@ function MobileNav({ open, onClose, cartCount }) {
           ))}
         </div>
         <div className="mobile-nav__secondary">
-          <Link to="/account" onClick={onClose}>Account</Link>
+          <Link to={isAuthenticated ? '/account' : '/sign-in'} onClick={onClose}>{isAuthenticated ? 'Your account' : 'Sign in'}</Link>
           <Link to="/cart" onClick={onClose}>Cart{cartCount ? ` (${cartCount})` : ''}</Link>
           <Link to="/track-order" onClick={onClose}>Track an order</Link>
           <Link to="/custom-project" onClick={onClose}>Start a custom project</Link>
@@ -69,6 +70,7 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = useState(false)
   // Cart count is global state, so the badge is correct on every page.
   const { count: cartCount } = useCart()
+  const { isAuthenticated } = useAuth()
 
   return (
     <>
@@ -85,7 +87,9 @@ export function SiteHeader() {
           </nav>
           <div className="header__actions">
             <IconButton icon="search" label="Search" onClick={() => setSearchOpen(true)} />
-            <IconButton icon="account" label="Account" to="/account" />
+            {/* Sends signed-in visitors to their account and everyone else to
+                sign-in, so the control never leads somewhere that redirects. */}
+            <IconButton icon="account" label={isAuthenticated ? 'Your account' : 'Sign in'} to={isAuthenticated ? '/account' : '/sign-in'} />
             <IconButton icon="cart" label={`Cart${cartCount ? `, ${cartCount} items` : ', empty'}`} to="/cart" className="cart-indicator">
               {cartCount > 0 && <span className="cart-indicator__count" aria-hidden="true">{cartCount}</span>}
             </IconButton>
@@ -93,7 +97,7 @@ export function SiteHeader() {
           </div>
         </div>
       </header>
-      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} cartCount={cartCount} />
+      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} cartCount={cartCount} isAuthenticated={isAuthenticated} />
       <SearchPanel open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )

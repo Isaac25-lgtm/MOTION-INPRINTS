@@ -4,6 +4,7 @@ import { CURRENCY, add, isAmount, toAmount, toWire } from './money.js'
 import { generateReference } from './references.js'
 import { calculatePrice, loadPricingContext } from './pricing.js'
 import { assertAcceptable } from './quotes.js'
+import { createTrackingToken, hashTrackingToken } from './workflow.js'
 
 /* Order creation (Prompts 8.1, 8.3) and quote conversion (Prompt 6.4).
 
@@ -122,6 +123,10 @@ export async function createOrder(db, {
 
   const reference = await generateReference(db, 'order', { table: 'orders', column: 'order_number' })
   const orderId = randomUUID()
+  /* Guest tracking needs a credential the order number cannot supply. The
+     plaintext is returned once, with the confirmation; only its hash is stored,
+     so references stay short and unguessable access stays separate (Prompt 9.2). */
+  const trackingToken = createTrackingToken()
 
   // The response is known before anything is written, so it can be stored inside
   // the same transaction as the order it describes.
@@ -132,6 +137,8 @@ export async function createOrder(db, {
     fulfilment_method: fulfilment.method, contact_name: contact.name,
     created_at: new Date().toISOString(), quote_id: quoteId,
   }, persistedLines)
+  // Returned once so the confirmation page can offer a tracking link.
+  result.trackingToken = trackingToken
 
   try {
     await db.transaction((tx) => {
@@ -139,11 +146,12 @@ export async function createOrder(db, {
         tx.query(
           `INSERT INTO public.orders(id, order_number, customer_id, quote_id, contact_name, contact_email, contact_phone, company_name,
                                      status_code, subtotal, total_amount, tax_amount, delivery_amount, currency,
-                                     fulfilment_method, delivery_address, delivery_notes, notes, placed_by_auth_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+                                     fulfilment_method, delivery_address, delivery_notes, notes, placed_by_auth_user_id, tracking_token)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
           [orderId, reference, customerId, quoteId, contact.name, contact.email, contact.phone || null, contact.company || null,
             openingStatus, subtotal, total, tax, delivery, CURRENCY,
-            fulfilment.method, fulfilment.address || null, fulfilment.notes || null, notes, authUserId],
+            fulfilment.method, fulfilment.address || null, fulfilment.notes || null, notes, authUserId,
+            hashTrackingToken(trackingToken)],
         ),
         tx.query(
           'INSERT INTO public.order_status_history(order_id, status_code, changed_by_auth_user_id, note) VALUES ($1,$2,$3,$4)',

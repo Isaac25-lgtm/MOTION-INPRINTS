@@ -112,8 +112,235 @@ describeIfDb('schema behaviour (real database)', () => {
       '0001_motion_core.sql', '0002_initial_taxonomy.sql', '0003_pricing_components.sql',
       '0004_quotes_and_orders.sql', '0005_portfolio_and_cms.sql', '0006_quote_status_vocabulary.sql',
       '0007_accepted_quote_immutability.sql', '0008_quote_access_and_lifecycle.sql',
-      '0009_catalogue_relationships_and_uploads.sql',
+      '0009_catalogue_relationships_and_uploads.sql', '0010_proofs_tracking_and_audit.sql', '0011_proof_evidence_integrity.sql', '0012_proof_supersession_invariant.sql',
     ])
+  })
+
+  /* ── Category 9/10 guarantees, verified against real PostgreSQL ─────────── */
+
+  const newOrder = async (columns = '', values = [], status = 'new') => {
+    const { rows } = await client.query(
+      `INSERT INTO public.orders(order_number, contact_name, contact_email, status_code, subtotal, total_amount${columns})
+       VALUES ($1,'Ada','ada@example.test',$2,1000,1000${values.map((_, i) => `,$${i + 3}`).join('')})
+       RETURNING id, order_number`,
+      [`MOT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, status, ...values])
+    return rows[0]
+  }
+
+  it('refuses production entry without an approved proof', async () => {
+    await inRollback(async () => {
+      const order = await newOrder(', requires_proof_approval', [true], 'design_in_progress')
+      // The guard lives in the database, so no route, script or bulk action can
+      // bypass it — including one written later that forgets to check.
+      await expectRejection(
+        () => client.query("UPDATE public.orders SET status_code='in_production' WHERE id=$1", [order.id]),
+        /requires a customer-approved proof/i)
+      // Sending the job out for approval is still permitted.
+      await expect(client.query("UPDATE public.orders SET status_code='awaiting_customer_approval' WHERE id=$1", [order.id])).resolves.toBeTruthy()
+    })
+  })
+
+  it('permits only one proof awaiting a response per order', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const { rows: [first] } = await client.query(
+        "INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,1,'awaiting_response') RETURNING id", [order.id])
+      await expectRejection(
+        () => client.query("INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,2,'awaiting_response')", [order.id]),
+        /design_proofs_one_active|duplicate key/i)
+      // A revision is allowed once the previous version is superseded.
+      await client.query("UPDATE public.design_proofs SET status='superseded', superseded_at=now() WHERE id=$1", [first.id])
+      await expect(client.query("INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,2,'awaiting_response')", [order.id])).resolves.toBeTruthy()
+    })
+  })
+
+  it('treats an answered proof as evidence that cannot be rewritten', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const { rows: [proof] } = await client.query(
+        "INSERT INTO public.design_proofs(order_id, version, status, customer_response_at, customer_comment) VALUES($1,1,'approved',now(),'Approved') RETURNING id",
+        [order.id])
+      await expectRejection(() => client.query("UPDATE public.design_proofs SET customer_comment='rewritten' WHERE id=$1", [proof.id]), /has been answered/i)
+      await expectRejection(() => client.query('UPDATE public.design_proofs SET version=9 WHERE id=$1', [proof.id]), /has been answered/i)
+      // Superseding remains possible: that records history rather than altering it.
+      await expect(client.query("UPDATE public.design_proofs SET status='superseded', superseded_at=now() WHERE id=$1", [proof.id])).resolves.toBeTruthy()
+    })
+  })
+
+  /* Proof evidence integrity (migration 0011).
+     Two defects were reproducible before it: an answered proof could be deleted,
+     and a proof belonging to another order could satisfy the production gate. */
+
+  const someMedia = async () => {
+    const { rows } = await client.query(
+      `INSERT INTO public.media_assets(object_key, original_filename, mime_type, byte_size, visibility, purpose)
+       VALUES ($1,'proof.pdf','application/pdf',1024,'private','design_proof') RETURNING id`,
+      [`design_proof/${Math.random().toString(36).slice(2)}.pdf`])
+    return rows[0].id
+  }
+
+  const answeredProof = async (orderId, version = 1, status = 'approved') => {
+    const { rows } = await client.query(
+      `INSERT INTO public.design_proofs(order_id, version, status, customer_response_at, customer_comment)
+       VALUES($1,$2,$3,now(),'Approved') RETURNING id`, [orderId, version, status])
+    return rows[0].id
+  }
+
+  it('refuses to delete a proof the customer has answered', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const proof = await answeredProof(order.id)
+      await expectRejection(() => client.query('DELETE FROM public.design_proofs WHERE id=$1', [proof]), /cannot be deleted/i)
+      // An unanswered proof is not evidence and may still be withdrawn.
+      const { rows: [draft] } = await client.query(
+        "INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,2,'awaiting_response') RETURNING id", [order.id])
+      await expect(client.query('DELETE FROM public.design_proofs WHERE id=$1', [draft.id])).resolves.toBeTruthy()
+    })
+  })
+
+  it('freezes every evidentiary field once a proof is answered', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const other = await newOrder('', [], 'design_in_progress')
+      const proof = await answeredProof(order.id)
+
+      const forbidden = [
+        ['order_id', 'UPDATE public.design_proofs SET order_id=$2 WHERE id=$1', [proof, other.id]],
+        ['version', 'UPDATE public.design_proofs SET version=9 WHERE id=$1', [proof]],
+        // Setting an already-null column to null is not a change, so the probe
+        // uses a real asset id to make it an actual rewrite of the file.
+        ['media_id', 'UPDATE public.design_proofs SET media_id=$2 WHERE id=$1', [proof, await someMedia()]],
+        ['motion_notes', "UPDATE public.design_proofs SET motion_notes='rewritten' WHERE id=$1", [proof]],
+        ['uploader', 'UPDATE public.design_proofs SET uploaded_by_auth_user_id=gen_random_uuid() WHERE id=$1', [proof]],
+        // Both were written with now() inside this same transaction, and now() is
+        // fixed for its duration — so re-setting them to now() would change
+        // nothing. The probes shift the value to make it a real rewrite.
+        ['created_at', "UPDATE public.design_proofs SET created_at = now() - interval '1 day' WHERE id=$1", [proof]],
+        ['response_at', "UPDATE public.design_proofs SET customer_response_at = now() + interval '1 day' WHERE id=$1", [proof]],
+        ['comment', "UPDATE public.design_proofs SET customer_comment='different' WHERE id=$1", [proof]],
+        ['status back to open', "UPDATE public.design_proofs SET status='awaiting_response' WHERE id=$1", [proof]],
+      ]
+      for (const [label, sql, params] of forbidden) {
+        await expectRejection(() => client.query(sql, params), new RegExp(`answered`, 'i'))
+        expect(label).toBeTruthy()
+      }
+    })
+  })
+
+  it('permits supersession of an answered proof exactly once, preserving its evidence', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const proof = await answeredProof(order.id)
+      await expect(client.query("UPDATE public.design_proofs SET status='superseded', superseded_at=now() WHERE id=$1", [proof])).resolves.toBeTruthy()
+      // The original response survives supersession.
+      const { rows: [after] } = await client.query('SELECT customer_response_at, customer_comment FROM public.design_proofs WHERE id=$1', [proof])
+      expect(after.customer_response_at).not.toBeNull()
+      expect(after.customer_comment).toBe('Approved')
+      /* Superseding twice would rewrite history. `now()` is fixed for the whole
+         transaction, so re-setting it to now() is not a change at all — the probe
+         has to use a genuinely different timestamp to test the guard. */
+      await expectRejection(
+        () => client.query("UPDATE public.design_proofs SET superseded_at = now() + interval '1 hour' WHERE id=$1", [proof]),
+        /already superseded/i)
+    })
+  })
+
+  it('refuses a half-superseded proof, in either direction', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const proof = await answeredProof(order.id)
+
+      /* Either half-state is corrupting, not untidy: the partial unique index
+         filters on superseded_at while the production gate reads status, so a
+         proof superseded on one column and still 'approved' on the other stays
+         valid evidence for production after being replaced. */
+      await expectRejection(
+        () => client.query('UPDATE public.design_proofs SET superseded_at = now() WHERE id=$1', [proof]),
+        /superseded_at together|supersession_consistent/i)
+      await expectRejection(
+        () => client.query("UPDATE public.design_proofs SET status='superseded' WHERE id=$1", [proof]),
+        /superseded_at together|supersession_consistent/i)
+
+      // Both together is the one permitted transition.
+      await expect(client.query(
+        "UPDATE public.design_proofs SET status='superseded', superseded_at=now() WHERE id=$1", [proof],
+      )).resolves.toBeTruthy()
+    })
+  })
+
+  it('holds the supersession invariant for unanswered proofs too', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      const { rows: [draft] } = await client.query(
+        "INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,1,'awaiting_response') RETURNING id", [order.id])
+
+      // The CHECK constraint applies to every row, so the rule cannot be evaded
+      // by acting before the customer responds.
+      await expectRejection(
+        () => client.query('UPDATE public.design_proofs SET superseded_at = now() WHERE id=$1', [draft.id]),
+        /supersession_consistent/i)
+      await expectRejection(
+        () => client.query("UPDATE public.design_proofs SET status='superseded' WHERE id=$1", [draft.id]),
+        /supersession_consistent/i)
+      await expect(client.query(
+        "UPDATE public.design_proofs SET status='superseded', superseded_at=now() WHERE id=$1", [draft.id],
+      )).resolves.toBeTruthy()
+    })
+  })
+
+  it('rejects a half-superseded proof at insert', async () => {
+    await inRollback(async () => {
+      const order = await newOrder('', [], 'design_in_progress')
+      await expectRejection(
+        () => client.query("INSERT INTO public.design_proofs(order_id, version, status, superseded_at) VALUES($1,1,'approved',now())", [order.id]),
+        /supersession_consistent/i)
+      await expectRejection(
+        () => client.query("INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,1,'superseded')", [order.id]),
+        /supersession_consistent/i)
+    })
+  })
+
+  it('refuses a proof from another order as approval', async () => {
+    await inRollback(async () => {
+      const target = await newOrder(', requires_proof_approval', [true], 'design_in_progress')
+      const other = await newOrder('', [], 'design_in_progress')
+      const foreign = await answeredProof(other.id)
+      // Rejected when set, so the invalid state never exists to be exploited.
+      await expectRejection(() => client.query('UPDATE public.orders SET approved_proof_id=$1 WHERE id=$2', [foreign, target.id]),
+        /belongs to a different order/i)
+    })
+  })
+
+  it('refuses unanswered and changes-requested proofs as approval', async () => {
+    await inRollback(async () => {
+      const order = await newOrder(', requires_proof_approval', [true], 'design_in_progress')
+      const { rows: [open] } = await client.query(
+        "INSERT INTO public.design_proofs(order_id, version, status) VALUES($1,1,'awaiting_response') RETURNING id", [order.id])
+      await expectRejection(() => client.query('UPDATE public.orders SET approved_proof_id=$1 WHERE id=$2', [open.id, order.id]),
+        /not been approved/i)
+      const rejected = await answeredProof(order.id, 2, 'changes_requested')
+      await expectRejection(() => client.query('UPDATE public.orders SET approved_proof_id=$1 WHERE id=$2', [rejected, order.id]),
+        /not been approved/i)
+    })
+  })
+
+  it('lets a genuine approval reach production', async () => {
+    await inRollback(async () => {
+      const order = await newOrder(', requires_proof_approval', [true], 'design_in_progress')
+      const proof = await answeredProof(order.id)
+      await client.query('UPDATE public.orders SET approved_proof_id=$1 WHERE id=$2', [proof, order.id])
+      await expect(client.query("UPDATE public.orders SET status_code='approved' WHERE id=$1", [order.id])).resolves.toBeTruthy()
+      await expect(client.query("UPDATE public.orders SET status_code='in_production' WHERE id=$1", [order.id])).resolves.toBeTruthy()
+      await expect(client.query("UPDATE public.orders SET status_code='ready' WHERE id=$1", [order.id])).resolves.toBeTruthy()
+    })
+  })
+
+  it('stores guest tracking tokens hashed, never in plaintext', async () => {
+    await inRollback(async () => {
+      const order = await newOrder()
+      await expectRejection(() => client.query("UPDATE public.orders SET tracking_token='plaintext' WHERE id=$1", [order.id]), /orders_tracking_token_hashed/i)
+      await expect(client.query('UPDATE public.orders SET tracking_token=$1 WHERE id=$2', ['a'.repeat(64), order.id])).resolves.toBeTruthy()
+    })
   })
 
   it('enforces catalogue relationships and compatibility rule shape', async () => {

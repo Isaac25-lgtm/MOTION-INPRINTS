@@ -224,6 +224,29 @@ export function OrderConfirmedPage() {
             <div className="detail-list__row"><dt>Payment</dt><dd>Not yet paid — we will confirm arrangements with you.</dd></div>
           </dl>
 
+          {/* The tracking code is shown exactly once, here. The server stores only
+              its hash, so it cannot be recovered or re-sent — which is what makes
+              it safe to hand out. */}
+          {order?.trackingToken && (
+            <section className="proof-panel stack" aria-labelledby="tracking">
+              <p className="t-eyebrow t-eyebrow--accent">Save this now</p>
+              <h2 className="t-h3" id="tracking">Your tracking code</h2>
+              <p className="t-body-sm">
+                This code is shown once and cannot be sent again. Keep it to check progress
+                without signing in.
+              </p>
+              <p className="tracking-code"><code>{order.trackingToken}</code></p>
+              <div className="cluster">
+                <Button
+                  to={`/track-order?reference=${encodeURIComponent(order.reference)}&token=${encodeURIComponent(order.trackingToken)}`}
+                  variant="primary"
+                >
+                  Track this order
+                </Button>
+              </div>
+            </section>
+          )}
+
           <div className="prose">
             <h2 className="t-h3">What happens next</h2>
             <p>

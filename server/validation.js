@@ -147,6 +147,27 @@ export const projectIntakeSchema = z.object({
   answers: z.record(z.string().max(64), z.union([z.string().max(2000), z.number(), z.boolean()])).default({}),
 })
 
+/* Proofs (Prompt 9.3). A customer may approve or ask for changes; asking for
+   changes requires saying what should change, or the request is not actionable. */
+export const proofResponseSchema = z.object({
+  action: z.enum(['approve', 'request_changes']),
+  comment: z.string().trim().min(2).max(4000).optional(),
+}).superRefine((value, context) => {
+  if (value.action === 'request_changes' && !value.comment) {
+    context.addIssue({ code: 'custom', path: ['comment'], message: 'Tell us what needs changing.' })
+  }
+})
+
+export const proofUploadSchema = z.object({
+  mediaId: idSchema.nullish(),
+  orderItemId: idSchema.nullish(),
+  notes: z.string().trim().max(4000).nullish(),
+})
+
+/* Internal notes are operational and never shown to a customer, which is why they
+   are a separate endpoint from anything the customer view reads. */
+export const internalNotesSchema = z.object({ notes: z.string().trim().max(10000) })
+
 export function validate(schema, value) { const parsed = schema.safeParse(value); if (!parsed.success) throw new ApiError(422, 'validation_failed', 'One or more values are invalid.', parsed.error.flatten().fieldErrors); return parsed.data }
 
 // Builds a partial UPDATE from an allow-listed field-to-column map. Column names never come from request data.

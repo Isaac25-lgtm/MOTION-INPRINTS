@@ -1,12 +1,17 @@
 import { ApiError, fail, json, ok, parsePaging, readJson } from './http.js'
 import { requireAdmin, requireAuth, requireCustomer, requireOwnership } from './auth.js'
-import { buildUpdate, cartSchema, categoryPatchSchema, categorySchema, checkoutSchema, contentSchema, idSchema, orderStatusSchema, pricingRequestSchema, productPatchSchema, productSchema, profileSchema, projectIntakeSchema, projectPatchSchema, projectSchema, quotePrepareSchema, quoteRequestSchema, quoteResponseSchema, uploadIntentSchema, validate } from './validation.js'
+import { buildUpdate, cartSchema, categoryPatchSchema, categorySchema, checkoutSchema, contentSchema, idSchema, orderStatusSchema, pricingRequestSchema, productPatchSchema, productSchema, profileSchema, projectIntakeSchema, projectPatchSchema, projectSchema, internalNotesSchema, proofResponseSchema, proofUploadSchema, quotePrepareSchema, quoteRequestSchema, quoteResponseSchema, uploadIntentSchema, validate } from './validation.js'
 import { createObjectKey, validateUpload } from './storage.js'
 import { calculatePrice, loadPricingContext } from './pricing.js'
 import { CURRENCY, toWire } from './money.js'
 import { checkIdempotency, convertQuoteToOrder, createOrder } from './orders.js'
 import { generateReference } from './references.js'
 import { QUOTE_STATUS, acceptQuote, assertAcceptable, createAccessToken, createQuote, hashToken, loadQuote, presentQuote, quoteTokenAllowsAccess } from './quotes.js'
+// Category 9/10: customer portal, tracking, proofs, reorder, admin operations.
+import { CUSTOMER_STATUS, assertTransition, buildTimeline, createProof, presentProof, recordAudit, respondToProof, trackingTokenMatches } from './workflow.js'
+import { evaluateReorder } from './reorder.js'
+import { buildReport, operationalSnapshot } from './reports.js'
+import { toAmount } from './money.js'
 
 const routes = (pathname) => pathname.replace(/^\/api/, '').split('/').filter(Boolean)
 const publicProductFields = 'id, name, slug, short_description, description, category_id, pricing_type, starting_price, currency, production_lead_time'
@@ -64,7 +69,21 @@ export function createApi({ db, authenticate = async () => null, logger = consol
       else if (request.method === 'POST' && parts[0] === 'me') { const actor = await requireAuth(request, authenticate); const body = validate(profileSchema, await readJson(request)); if (actor.profile) throw new ApiError(409, 'profile_exists', 'A profile already exists.'); const rows = await db.query('INSERT INTO public.user_profiles(auth_user_id,role,full_name,phone,company_name) VALUES($1,$2,$3,$4,$5) RETURNING id,auth_user_id,role,full_name,phone,company_name', [actor.authUserId,'customer',body.fullName,body.phone || null,body.companyName || null]); response = ok(rows[0], 201) }
       else if (request.method === 'PATCH' && parts[0] === 'me') { const actor = await requireCustomer(request, authenticate); const body = validate(profileSchema, await readJson(request)); const rows = await db.query('UPDATE public.user_profiles SET full_name=$1,phone=$2,company_name=$3 WHERE id=$4 RETURNING id,auth_user_id,role,full_name,phone,company_name', [body.fullName,body.phone || null,body.companyName || null,actor.profile.id]); response = ok(rows[0]) }
       else if (request.method === 'GET' && parts[0] === 'orders' && !parts[1]) { const actor = await requireCustomer(request, authenticate); response = ok(await db.query('SELECT id,order_number,status_code,total_amount,currency,created_at FROM public.orders WHERE customer_id=$1 ORDER BY created_at DESC', [actor.profile.id])) }
-      else if (request.method === 'GET' && parts[0] === 'orders' && parts[1]) { const actor = await requireCustomer(request, authenticate); const row = (await db.query('SELECT id,customer_id,order_number,status_code,total_amount,currency,created_at FROM public.orders WHERE id=$1', [validate(idSchema, parts[1])]))[0]; response = ok(requireOwnership(row, actor)) }
+      else if (request.method === 'GET' && parts[0] === 'orders' && parts[1] && !parts[2]) response = ok(await customerOrderDetail(db, request, parts[1], authenticate))
+      /* Reorder proposes; it never repeats a charge. Every line is re-validated
+         and re-priced at today's rates before the customer sees it (Prompt 9.4). */
+      else if (request.method === 'GET' && parts[0] === 'orders' && parts[1] && parts[2] === 'reorder') {
+        const actor = await requireCustomer(request, authenticate)
+        const id = validate(idSchema, parts[1])
+        const [owned] = await db.query('SELECT id, customer_id, order_number FROM public.orders WHERE id=$1', [id])
+        requireOwnership(owned, actor)
+        response = ok({ order: { id: owned.id, reference: owned.order_number }, ...(await evaluateReorder(db, id)) })
+      }
+      else if (request.method === 'GET' && parts[0] === 'orders' && parts[1] && parts[2] === 'proofs') response = ok(await customerProofs(db, request, parts[1], authenticate))
+      else if (request.method === 'POST' && parts[0] === 'proofs' && parts[1] && parts[2] === 'respond') response = ok(await respondToProofRequest(db, request, parts[1], authenticate))
+      /* Guest tracking. The order number alone is never sufficient; a separate
+         high-entropy token is required, so references cannot be enumerated. */
+      else if (request.method === 'GET' && parts[0] === 'track' && parts[1]) response = ok(await trackOrder(db, parts[1], url))
       else if (request.method === 'GET' && parts[0] === 'quotes' && !parts[1]) {
         const actor = await requireCustomer(request, authenticate)
         response = ok(await db.query(
@@ -100,6 +119,130 @@ export function createApi({ db, authenticate = async () => null, logger = consol
     } catch (error) { logger.error?.({ method: request.method, path: url.pathname, code: error.code, ms: Date.now() - started }, 'api_error'); return fail(error) }
   }
 }
+/* Customer order detail and tracking (Prompts 9.1, 9.2).
+
+   The customer view is assembled deliberately rather than by selecting `*`:
+   internal notes, tracking-token hashes and staff identities must never cross
+   this boundary, and an explicit column list is what guarantees that. */
+const CUSTOMER_ORDER_FIELDS = `o.id, o.order_number, o.status_code, o.subtotal, o.tax_amount, o.delivery_amount,
+  o.total_amount, o.currency, o.fulfilment_method, o.delivery_address, o.contact_name, o.contact_email,
+  o.contact_phone, o.company_name, o.notes, o.quote_id, o.requires_proof_approval, o.approved_proof_id, o.created_at`
+
+async function assembleOrderView(db, order) {
+  const [items, history, proofs, payments] = await Promise.all([
+    db.query(`SELECT id, title, quantity, unit_price, line_total, configuration, design_service_required, artwork_status
+              FROM public.order_items WHERE order_id=$1 ORDER BY id`, [order.id]),
+    db.query('SELECT status_code, note, created_at FROM public.order_status_history WHERE order_id=$1 ORDER BY created_at', [order.id]),
+    db.query(`SELECT id, version, status, motion_notes, created_at, customer_response_at, customer_comment, superseded_at, media_id
+              FROM public.design_proofs WHERE order_id=$1 ORDER BY version DESC`, [order.id]),
+    db.query('SELECT status, amount, currency, created_at FROM public.payments WHERE order_id=$1 ORDER BY created_at DESC', [order.id]),
+  ])
+
+  const settled = payments.find(payment => payment.status === 'successful')
+  const active = proofs.find(proof => !proof.superseded_at && proof.status === 'awaiting_response')
+  const customerStatus = CUSTOMER_STATUS[order.status_code] || { label: order.status_code }
+
+  return {
+    id: order.id,
+    reference: order.order_number,
+    status: order.status_code,
+    statusLabel: customerStatus.label,
+    statusDescription: customerStatus.description || null,
+    // The single next thing the customer can do, or null. Surfacing an action
+    // that does not apply is worse than surfacing none (Prompt 9.1).
+    action: customerStatus.action || (active ? 'review_proof' : null),
+    currency: order.currency,
+    subtotal: toWire(toAmount(order.subtotal)),
+    taxAmount: toWire(toAmount(order.tax_amount)),
+    deliveryAmount: toWire(toAmount(order.delivery_amount)),
+    total: toWire(toAmount(order.total_amount)),
+    fulfilmentMethod: order.fulfilment_method,
+    deliveryAddress: order.delivery_address,
+    contactName: order.contact_name,
+    company: order.company_name,
+    customerNotes: order.notes,
+    quoteId: order.quote_id,
+    createdAt: order.created_at,
+    paymentStatus: settled ? 'paid' : (payments[0]?.status || 'unpaid'),
+    items: items.map(item => ({
+      id: item.id, title: item.title, quantity: item.quantity,
+      unitPrice: toWire(toAmount(item.unit_price)), lineTotal: toWire(toAmount(item.line_total)),
+      configuration: item.configuration || {},
+      designServiceRequired: item.design_service_required,
+      artworkStatus: item.artwork_status,
+    })),
+    timeline: buildTimeline(order.status_code, history),
+    activeProof: active ? { id: active.id, version: active.version, notes: active.motion_notes, createdAt: active.created_at } : null,
+    proofs: proofs.map(proof => ({
+      id: proof.id, version: proof.version, status: proof.status,
+      notes: proof.motion_notes, createdAt: proof.created_at,
+      respondedAt: proof.customer_response_at, comment: proof.customer_comment,
+      superseded: Boolean(proof.superseded_at),
+    })),
+  }
+}
+
+async function customerOrderDetail(db, request, orderId, authenticate) {
+  const actor = await requireCustomer(request, authenticate)
+  const [order] = await db.query(`SELECT ${CUSTOMER_ORDER_FIELDS}, o.customer_id FROM public.orders o WHERE o.id=$1`, [validate(idSchema, orderId)])
+  requireOwnership(order, actor)
+  return assembleOrderView(db, order)
+}
+
+/* Guest tracking. The reference identifies; the token authorises. A wrong token
+   returns the same 404 as an unknown reference, so references cannot be probed. */
+async function trackOrder(db, reference, url) {
+  const token = url.searchParams.get('token')
+  if (!token) throw new ApiError(404, 'not_found', 'Order not found.')
+  const [order] = await db.query(`SELECT ${CUSTOMER_ORDER_FIELDS}, o.tracking_token FROM public.orders o WHERE o.order_number=$1`, [String(reference).slice(0, 40)])
+  if (!order || !trackingTokenMatches(token, order.tracking_token)) throw new ApiError(404, 'not_found', 'Order not found.')
+
+  const view = await assembleOrderView(db, order)
+
+  /* A tracking link may be forwarded, printed on a job bag or read over a
+     shoulder. Whoever holds it learns where the job has got to and nothing else.
+     Built by explicit allowlist rather than by deleting fields from the customer
+     view — deletion is a list that silently stops being complete the moment
+     another field is added upstream. */
+  return {
+    reference: view.reference,
+    status: view.status,
+    statusLabel: view.statusLabel,
+    statusDescription: view.statusDescription,
+    fulfilmentMethod: view.fulfilmentMethod,
+    paymentStatus: view.paymentStatus,
+    createdAt: view.createdAt,
+    timeline: view.timeline,
+    // Item titles and quantities identify the job; configuration, prices,
+    // artwork state and internal notes do not belong to a tracking view.
+    items: view.items.map(item => ({ title: item.title, quantity: item.quantity })),
+    // Progress is visible; the customer's address, contact details, order value
+    // and notes are not.
+  }
+}
+
+async function customerProofs(db, request, orderId, authenticate) {
+  const actor = await requireCustomer(request, authenticate)
+  const id = validate(idSchema, orderId)
+  const [order] = await db.query('SELECT id, customer_id FROM public.orders WHERE id=$1', [id])
+  requireOwnership(order, actor)
+  const proofs = await db.query('SELECT * FROM public.design_proofs WHERE order_id=$1 ORDER BY version DESC', [id])
+  return proofs.map(proof => presentProof(proof))
+}
+
+/* A customer may only answer a proof on their own order, and only the version
+   that is currently awaiting a response (Prompt 9.3). */
+async function respondToProofRequest(db, request, proofId, authenticate) {
+  const actor = await requireCustomer(request, authenticate)
+  const body = validate(proofResponseSchema, await readJson(request))
+  const [proof] = await db.query(
+    `SELECT p.*, o.customer_id FROM public.design_proofs p JOIN public.orders o ON o.id = p.order_id WHERE p.id=$1`,
+    [validate(idSchema, proofId)])
+  if (!proof || proof.customer_id !== actor.profile.id) throw new ApiError(404, 'not_found', 'Proof not found.')
+  const updated = await respondToProof(db, { proof, action: body.action, comment: body.comment || null, authUserId: actor.authUserId })
+  return presentProof(updated)
+}
+
 /* Project intake (Prompt 6.1). Type-specific answers are stored as a document, so
    a signage enquiry and a POS enquiry share one endpoint without one of them
    carrying a column of nulls. The reference is random, not sequential. */
@@ -398,6 +541,89 @@ async function search(db, url, decorate) {
 
 async function adminApi(request, parts, db, authenticate) {
   const admin = await requireAdmin(request, authenticate)
+
+  /* ── Dashboard and reports (Prompts 10.1, 10.6) ─────────────────────────── */
+  if (request.method === 'GET' && parts[0] === 'dashboard') return ok(await operationalSnapshot(db))
+  if (request.method === 'GET' && parts[0] === 'reports') {
+    const url = new URL(request.url)
+    return ok(await buildReport(db, {
+      range: url.searchParams.get('range') || 'this_month',
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+    }))
+  }
+
+  /* ── Orders and production (Prompt 10.3) ────────────────────────────────── */
+  if (request.method === 'GET' && parts[0] === 'orders' && parts[1] && !parts[2]) {
+    const id = validate(idSchema, parts[1])
+    const [order] = await db.query('SELECT * FROM public.orders WHERE id=$1', [id])
+    if (!order) throw new ApiError(404, 'not_found', 'Order not found.')
+    const view = await assembleOrderView(db, order)
+    // Staff see the operational record; customers never do.
+    const [artwork, audit] = await Promise.all([
+      db.query(`SELECT m.id, m.original_filename, m.mime_type, m.byte_size, m.purpose, m.created_at, oim.order_item_id
+                FROM public.order_item_media oim JOIN public.media_assets m ON m.id = oim.media_id
+                JOIN public.order_items oi ON oi.id = oim.order_item_id WHERE oi.order_id=$1`, [id]),
+      db.query('SELECT action, summary, created_at FROM public.admin_audit_log WHERE entity_type=$1 AND entity_id=$2 ORDER BY created_at DESC LIMIT 25', ['order', id]),
+    ])
+    return ok({ ...view, internalNotes: order.internal_notes, customerId: order.customer_id, artwork, audit })
+  }
+
+  if (request.method === 'PATCH' && parts[0] === 'orders' && parts[1] && parts[2] === 'notes') {
+    const body = validate(internalNotesSchema, await readJson(request))
+    const id = validate(idSchema, parts[1])
+    const [updated] = await db.query('UPDATE public.orders SET internal_notes=$1, updated_at=now() WHERE id=$2 RETURNING id', [body.notes, id])
+    if (!updated) throw new ApiError(404, 'not_found', 'Order not found.')
+    await recordAudit(db, { actorAuthUserId: admin.authUserId, action: 'order.notes_updated', entityType: 'order', entityId: id })
+    return ok({ id, updated: true })
+  }
+
+  /* ── Proofs (Prompt 9.3, admin side) ────────────────────────────────────── */
+  if (request.method === 'POST' && parts[0] === 'orders' && parts[1] && parts[2] === 'proofs') {
+    const body = validate(proofUploadSchema, await readJson(request))
+    const id = validate(idSchema, parts[1])
+    const proof = await createProof(db, { orderId: id, orderItemId: body.orderItemId || null, mediaId: body.mediaId || null, notes: body.notes || null, authUserId: admin.authUserId })
+    await recordAudit(db, { actorAuthUserId: admin.authUserId, action: 'proof.uploaded', entityType: 'order', entityId: id, summary: `Proof v${proof.version} sent` })
+    return ok(presentProof(proof), 201)
+  }
+
+  /* ── Customers (Prompt 10.4) ────────────────────────────────────────────── */
+  if (request.method === 'GET' && parts[0] === 'customers' && !parts[1]) {
+    const url = new URL(request.url)
+    const { limit, offset } = parsePaging(url)
+    const term = (url.searchParams.get('q') || '').trim()
+    const values = []
+    let where = "p.role = 'customer'"
+    if (term.length >= 2) { values.push(`%${term.replace(/[%_]/g, m => `\\${m}`)}%`); where += ` AND (p.full_name ILIKE $1 ESCAPE '\\' OR p.phone ILIKE $1 ESCAPE '\\' OR p.company_name ILIKE $1 ESCAPE '\\')` }
+    values.push(limit, offset)
+    // Authentication material is never selected — not hashes, not tokens, not claims.
+    return ok(await db.query(
+      `SELECT p.id, p.full_name, p.phone, p.company_name, p.created_at,
+              (SELECT COUNT(*) FROM public.orders o WHERE o.customer_id = p.id)::int AS order_count,
+              (SELECT COALESCE(SUM(o.total_amount),0) FROM public.orders o WHERE o.customer_id = p.id AND o.status_code <> 'cancelled') AS lifetime_value
+       FROM public.user_profiles p WHERE ${where}
+       ORDER BY p.created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`, values))
+  }
+
+  if (request.method === 'GET' && parts[0] === 'customers' && parts[1]) {
+    const id = validate(idSchema, parts[1])
+    const [profile] = await db.query('SELECT id, full_name, phone, company_name, role, created_at FROM public.user_profiles WHERE id=$1', [id])
+    if (!profile) throw new ApiError(404, 'not_found', 'Customer not found.')
+    const [orders, quotes] = await Promise.all([
+      db.query('SELECT id, order_number, status_code, total_amount, currency, created_at FROM public.orders WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 50', [id]),
+      db.query('SELECT id, request_number, project_type, status_code, created_at FROM public.quote_requests WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 50', [id]),
+    ])
+    return ok({ profile, orders, quotes })
+  }
+
+  /* ── Audit log (Prompt 10.7) ────────────────────────────────────────────── */
+  if (request.method === 'GET' && parts[0] === 'audit') {
+    const { limit, offset } = parsePaging(new URL(request.url))
+    return ok(await db.query(
+      'SELECT actor_auth_user_id, action, entity_type, entity_id, summary, created_at FROM public.admin_audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [limit, offset]))
+  }
+
   if (request.method === 'POST' && parts[0] === 'products') { const body = validate(productSchema, await readJson(request)); const rows = await db.query('INSERT INTO public.products(name,slug,category_id,short_description,description,pricing_type,starting_price,is_configurable,quote_required,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id,slug,status', [body.name,body.slug,body.categoryId || null,body.shortDescription || null,body.description || null,body.pricingType,body.startingPrice ?? null,body.isConfigurable,body.quoteRequired,body.status]); return ok(rows[0], 201) }
   if (request.method === 'PATCH' && parts[0] === 'products' && parts[1]) { const body = validate(productPatchSchema, await readJson(request)); const id = validate(idSchema,parts[1]); const { assignments, values } = buildUpdate(productColumns, body); const rows = await db.query(`UPDATE public.products SET ${assignments.join(',')} WHERE id=$${values.length + 1} RETURNING id,slug,status`, [...values,id]); if (!rows[0]) throw new ApiError(404,'not_found','Product not found.'); return ok(rows[0]) }
   if (request.method === 'DELETE' && parts[0] === 'products' && parts[1]) { const rows = await db.query("UPDATE public.products SET status='archived' WHERE id=$1 RETURNING id,status", [validate(idSchema,parts[1])]); if (!rows[0]) throw new ApiError(404,'not_found','Product not found.'); return ok(rows[0]) }
@@ -503,7 +729,34 @@ async function adminApi(request, parts, db, authenticate) {
     if (!rows[0]) throw new ApiError(404, 'not_found', 'Content entry not found.')
     return ok(rows[0])
   }
-  if (request.method === 'PATCH' && parts[0] === 'orders' && parts[1] && parts[2] === 'status') { const body = validate(orderStatusSchema, await readJson(request)); const id = validate(idSchema, parts[1]); const [rows, history] = await db.transaction((transaction) => [transaction.query('UPDATE public.orders SET status_code=$1 WHERE id=$2 RETURNING id,order_number,status_code', [body.statusCode,id]), transaction.query('INSERT INTO public.order_status_history(order_id,status_code,changed_by_auth_user_id,note) SELECT id,$1,$2,$3 FROM public.orders WHERE id=$4 RETURNING id', [body.statusCode,admin.authUserId,body.note || null,id])]); if (!rows[0] || !history[0]) throw new ApiError(404,'not_found','Order not found.'); return ok(rows[0]) }
+  /* Production transitions are validated against the workflow, so a crafted
+     request cannot move a job sideways or straight to completed. The database
+     additionally refuses production entry without an approved proof where one is
+     required, which no route can bypass (Prompt 10.3). */
+  if (request.method === 'PATCH' && parts[0] === 'orders' && parts[1] && parts[2] === 'status') {
+    const body = validate(orderStatusSchema, await readJson(request))
+    const id = validate(idSchema, parts[1])
+    const [current] = await db.query('SELECT id, order_number, status_code FROM public.orders WHERE id=$1', [id])
+    if (!current) throw new ApiError(404, 'not_found', 'Order not found.')
+
+    assertTransition(current.status_code, body.statusCode)
+
+    const results = await db.transaction((tx) => [
+      tx.query('UPDATE public.orders SET status_code=$1, updated_at=now() WHERE id=$2 AND status_code=$3 RETURNING id, order_number, status_code',
+        [body.statusCode, id, current.status_code]),
+      tx.query('INSERT INTO public.order_status_history(order_id, status_code, changed_by_auth_user_id, note) VALUES ($1,$2,$3,$4)',
+        [id, body.statusCode, admin.authUserId, body.note || null]),
+    ])
+    // Guarding on the previous status means a concurrent change loses rather than
+    // silently overwriting.
+    if (!results[0]?.[0]) throw new ApiError(409, 'status_changed', 'This order changed while you were working on it. Reload and try again.')
+
+    await recordAudit(db, {
+      actorAuthUserId: admin.authUserId, action: 'order.status_changed', entityType: 'order', entityId: id,
+      summary: `${current.status_code} → ${body.statusCode}`,
+    })
+    return ok(results[0][0])
+  }
   throw new ApiError(404, 'not_found', 'Admin endpoint not found.')
 }
 async function createUploadIntent(request, db, authenticate, storage) {

@@ -30,6 +30,8 @@ node db/migrate.js
 
 | File | Covers |
 | --- | --- |
+| `GO_LIVE_AUDIT.md` | Production readiness verdict and blockers |
+| `BACKLOG.md` | Prioritised post-launch work |
 | `COMMERCE.md` | Pricing engine, cart, quotes, orders, payments |
 | `DESIGN_SYSTEM.md` | Art direction, tokens, typography, layout, motion |
 | `PHOTOGRAPHY.md` | Image sourcing rules and media treatments |

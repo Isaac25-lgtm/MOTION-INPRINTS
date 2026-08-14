@@ -200,6 +200,138 @@
   border-block-start: var(--border-width) solid var(--border);
 }
 
+/* ── Customer portal and admin (Categories 9, 10) ────────────────────────── */
+
+/* Portal navigation is an underlined row, matching the site rather than
+   introducing a sidebar and a second visual language. */
+.account-nav, .admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+  border-block-end: var(--border-width) solid var(--border);
+  overflow-x: auto;
+}
+.account-nav__link, .admin-nav__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: var(--size-body-sm);
+  color: var(--text-muted);
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  white-space: nowrap;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+.account-nav__link:hover, .admin-nav__link:hover { color: var(--text); }
+.account-nav__link[aria-current='page'], .admin-nav__link[aria-current='page'] {
+  color: var(--text);
+  border-block-end-color: var(--text);
+  font-weight: var(--weight-medium);
+}
+
+.order-row { border-block-start: var(--border-width) solid var(--border); }
+.order-row__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-4);
+  transition: padding-inline-start var(--duration) var(--ease);
+}
+.order-row__link:hover { padding-inline-start: var(--space-2); }
+
+.attention-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width) solid var(--border);
+}
+
+/* The proof decision is the most consequential control in the portal, so it is
+   the one place given a border to set it apart. */
+.proof-panel {
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.reorder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+  border-block-start: var(--border-width) solid var(--border);
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+
+.timeline { display: grid; gap: 0; }
+.timeline__item {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: var(--space-3);
+  padding-block-end: var(--space-5);
+  position: relative;
+}
+/* The connecting line stops at the last stage rather than trailing into nothing. */
+.timeline__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  inset-block: 1.25rem 0;
+  inset-inline-start: 0.5625rem;
+  width: 1px;
+  background: var(--border);
+}
+.timeline__marker {
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-block-start: 0.15rem;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--bg);
+  color: var(--bg);
+}
+.timeline__item--done .timeline__marker { background: var(--text); border-color: var(--text); }
+.timeline__item--current .timeline__marker { border-color: var(--blue-600); border-width: 3px; }
+.timeline__item--upcoming .timeline__label { color: var(--text-muted); }
+.timeline__body { display: grid; gap: var(--space-1); }
+.timeline__label { font-weight: var(--weight-medium); font-size: var(--size-body-sm); }
+
+/* ── Admin tables and queues ─────────────────────────────────────────────── */
+
+.queue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--border-width);
+  background: var(--border);
+  border: var(--border-width) solid var(--border);
+}
+@media (min-width: 48rem) { .queue-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.queue-grid__item { background: var(--bg); padding: var(--space-4); display: grid; gap: var(--space-1); }
+.queue-grid__item dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* Tables scroll inside their own container; the page body never does. */
+.admin-table-wrap { overflow-x: auto; border-block-start: var(--border-width) solid var(--border); }
+.admin-table { width: 100%; border-collapse: collapse; font-size: var(--size-body-sm); }
+.admin-table th, .admin-table td { text-align: start; padding: var(--space-3); border-block-end: var(--border-width) solid var(--border); white-space: nowrap; }
+.admin-table thead th {
+  font-size: var(--size-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+}
+.admin-table tbody tr:hover { background: var(--ink-100); }
+.admin-table td:last-child, .admin-table th:last-child { text-align: end; }
+
 /* ── Page furniture ──────────────────────────────────────────────────────── */
 
 .page-head { display: grid; gap: var(--space-4); padding-block: var(--space-6) var(--space-7); }
