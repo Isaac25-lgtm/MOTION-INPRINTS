@@ -1,1 +1,1 @@
-export function LoadingState({ label = 'Loading…' }) { return <p role="status">{label}</p> }
+export { LoadingState } from './ui/States'

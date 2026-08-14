@@ -1,0 +1,247 @@
+/* Site chrome and page-level compositions. */
+
+:root { --header-height: 4.25rem; }
+@media (min-width: 62rem) { :root { --header-height: 4.75rem; } }
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.app-shell > main { flex: 1; }
+
+/* ── Announcement ────────────────────────────────────────────────────────── */
+
+.announcement {
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
+  font-size: var(--size-caption);
+}
+.announcement__inner { display: flex; align-items: center; justify-content: center; gap: var(--space-3); padding-block: var(--space-2); text-align: center; }
+.announcement a { text-decoration: underline; text-underline-offset: 0.2em; }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-block-end: var(--border-width) solid var(--border);
+}
+.header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: var(--header-height);
+}
+.header__nav { display: none; }
+@media (min-width: 62rem) { .header__nav { display: flex; gap: var(--space-5); margin-inline-start: var(--space-6); } }
+.header__actions { display: flex; align-items: center; gap: var(--space-1); margin-inline-start: auto; }
+@media (min-width: 62rem) { .header__menu { display: none; } }
+
+/* Logo lockup. Height-driven so the mark keeps its own proportions; the strapline
+   is live text beside the wordmark rather than a 6px-tall raster. */
+.wordmark { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; }
+.wordmark__logo { width: auto; height: 2rem; }
+@media (min-width: 62rem) { .wordmark__logo { height: 2.25rem; } }
+.wordmark__logo--lockup { height: 3rem; }
+@media (min-width: 62rem) { .wordmark__logo--lockup { height: 3.5rem; } }
+
+.wordmark__tag {
+  font-size: 0.5625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width) solid var(--border);
+  max-width: 5.5rem;
+  line-height: 1.35;
+}
+/* Below the fold of a small phone the strapline competes with the nav actions;
+   the logo already carries it in print. */
+@media (max-width: 40rem) { .wordmark__tag { display: none; } }
+
+.nav-item {
+  position: relative;
+  padding-block: var(--space-2);
+  color: var(--text-muted);
+  transition: color var(--duration) var(--ease);
+}
+.nav-item::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration) var(--ease);
+}
+.nav-item:hover { color: var(--text); }
+.nav-item:hover::after { transform: scaleX(1); }
+.nav-item[aria-current='page'] { color: var(--text); }
+.nav-item[aria-current='page']::after { transform: scaleX(1); }
+
+.cart-indicator { position: relative; }
+.cart-indicator__count {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  min-width: 1rem;
+  height: 1rem;
+  padding-inline: 3px;
+  display: grid;
+  place-items: center;
+  background: var(--blue-600);
+  color: var(--paper);
+  border-radius: var(--radius-full);
+  font-size: 0.625rem;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mobile drawer navigation — composed, not a stack of desktop links. */
+
+.mobile-nav { display: grid; gap: var(--space-6); }
+.mobile-nav__primary { display: grid; }
+.mobile-nav__primary a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--space-4);
+  border-block-end: var(--border-width) solid var(--border);
+  font-size: 1.375rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-heading);
+}
+.mobile-nav__primary a .arrow { color: var(--text-muted); }
+.mobile-nav__secondary { display: grid; gap: var(--space-3); }
+.mobile-nav__secondary a { color: var(--text-muted); font-size: var(--size-body-sm); }
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+
+.search-panel { display: grid; gap: var(--space-5); }
+.search-field { display: flex; gap: var(--space-2); align-items: center; border-block-end: 2px solid var(--text); padding-block-end: var(--space-2); }
+.search-field input { flex: 1; border: none; background: none; font-size: var(--size-h3); padding: 0; min-height: 2.75rem; }
+/* The outline moves to the wrapper so the whole field reads as focused; the
+   indicator is never simply removed. */
+.search-field:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+.search-field input:focus-visible { outline: none; }
+.search-group { display: grid; gap: var(--space-3); }
+.search-group__label { padding-block-end: var(--space-2); border-block-end: var(--border-width) solid var(--border); }
+.search-result { display: grid; gap: 2px; padding-block: var(--space-2); }
+.search-result:hover .search-result__title { text-decoration: underline; text-underline-offset: 0.2em; }
+.search-result__title { font-weight: var(--weight-medium); }
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+
+.hero { position: relative; }
+.hero__media { position: relative; }
+.hero__media .frame { aspect-ratio: 4 / 5; }
+@media (min-width: 48rem) { .hero__media .frame { aspect-ratio: 16 / 10; } }
+@media (min-width: 62rem) { .hero__media .frame { aspect-ratio: 16 / 9; } }
+
+.hero__body { display: grid; gap: var(--space-5); padding-block: var(--space-6) var(--space-7); }
+@media (min-width: 62rem) {
+  .hero { display: grid; grid-template-columns: 1fr; }
+  .hero__body { padding-block: var(--space-8) var(--space-7); max-width: 34rem; }
+}
+.hero__statement { display: grid; gap: 0; }
+.hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Word-per-line display setting: "Design. Print. Brand." reads as three
+   deliberate lines rather than one long centred sentence. */
+.hero__lines { display: grid; }
+.hero__lines span { display: block; }
+
+/* ── Process — a numbered typographic list, not a four-icon strip. */
+
+.process { display: grid; gap: 0; counter-reset: step; }
+.process__item {
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-5);
+  border-block-start: var(--border-width) solid var(--border);
+  grid-template-columns: 3rem 1fr;
+  align-items: start;
+}
+/* On phones the body copy must sit under the heading, not under the step number. */
+.process__item > p { grid-column: 2; }
+@media (min-width: 48rem) {
+  .process__item { grid-template-columns: 5rem 14rem 1fr; gap: var(--space-5); }
+  .process__item > p { grid-column: auto; }
+}
+.process__num { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: var(--size-caption); padding-block-start: 0.35rem; }
+
+/* ── Contact panel ───────────────────────────────────────────────────────── */
+
+.contact-grid { display: grid; gap: var(--space-6); }
+@media (min-width: 48rem) { .contact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 62rem) { .contact-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.contact-item { display: grid; gap: var(--space-2); align-content: start; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.footer { border-block-start: var(--border-width) solid var(--border); background: var(--bg-alt); }
+.footer__top { display: grid; gap: var(--space-7); padding-block: var(--space-8) var(--space-7); }
+@media (min-width: 48rem) { .footer__top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 62rem) { .footer__top { grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); gap: var(--space-6); } }
+.footer__col { display: grid; gap: var(--space-3); align-content: start; }
+.footer__col a { color: var(--text-muted); font-size: var(--size-body-sm); transition: color var(--duration) var(--ease); }
+/* Link lists are dense by design; padding gives thumbs a usable target without
+   opening the visual rhythm up. */
+.footer__col > a { padding-block: var(--space-1); }
+.footer__col a:hover { color: var(--text); }
+.footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--space-5);
+  border-block-start: var(--border-width) solid var(--border);
+}
+
+/* ── Page furniture ──────────────────────────────────────────────────────── */
+
+.page-head { display: grid; gap: var(--space-4); padding-block: var(--space-6) var(--space-7); }
+.page-head__title { max-width: 22ch; }
+
+.prose { display: grid; gap: var(--space-4); max-width: 62ch; }
+.prose p { line-height: var(--leading-relaxed); }
+
+.detail-list { display: grid; gap: 0; }
+.detail-list__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 30%) 1fr;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width) solid var(--border);
+  font-size: var(--size-body-sm);
+}
+.detail-list__row dt { color: var(--text-muted); }
+.detail-list__row dd { margin: 0; }
+
+/* Three-column rows (name / note / arrow) collapse to two on phones so the note
+   is not squeezed into a 90px column. */
+.detail-list__row--wide { grid-template-columns: 1fr auto; }
+.detail-list__row--wide > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+@media (min-width: 48rem) {
+  .detail-list__row--wide { grid-template-columns: minmax(10rem, 32%) 1fr auto; align-items: baseline; }
+  .detail-list__row--wide > :nth-child(2) { grid-column: auto; grid-row: auto; }
+}
+
+/* Service group: a bordered index rather than a grid of icon boxes. */
+.service-group { display: grid; gap: var(--space-5); }
+@media (min-width: 62rem) { .service-group { grid-template-columns: 18rem 1fr; gap: var(--space-7); } }
+.service-list { display: grid; }
+.service-list a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+  border-block-start: var(--border-width) solid var(--border);
+  transition: padding-inline-start var(--duration) var(--ease);
+}
+.service-list a:last-child { border-block-end: var(--border-width) solid var(--border); }
+.service-list a:hover { padding-inline-start: var(--space-3); }
+.service-list__name { font-size: var(--size-h4); font-weight: var(--weight-medium); }

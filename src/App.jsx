@@ -3,13 +3,27 @@ import { AdminLayout, CustomerLayout, PublicLayout } from './layouts/Layouts'
 import { RequireAdmin, RequireAuth } from './auth/RouteGuards'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { HomePage } from './pages/HomePage'
+import { ShopPage, ProductDetailPage } from './pages/ShopPage'
+import { ServicesPage, ServiceDetailPage } from './pages/ServicesPage'
+import { WorkPage, ProjectDetailPage } from './pages/WorkPage'
+import { AboutPage } from './pages/AboutPage'
+import { ContactPage } from './pages/ContactPage'
+import { CustomProjectPage } from './pages/CustomProjectPage'
+import { LegalPage } from './pages/LegalPage'
+import { StylePreviewPage } from './pages/StylePreviewPage'
 
-const publicRoutes = [
-  ['/', 'Home'], ['/shop', 'Shop'], ['/shop/:category', 'Shop category'],
-  ['/product/:slug', 'Product'], ['/services', 'Services'], ['/services/:slug', 'Service'],
-  ['/work', 'Work'], ['/work/:slug', 'Project'], ['/custom-project', 'Custom project'],
-  ['/quote', 'Quote request'], ['/cart', 'Cart'], ['/checkout', 'Checkout'],
-  ['/track-order', 'Track order'], ['/about', 'About'], ['/contact', 'Contact'],
+/* Routes still awaiting their own phase keep the placeholder page. */
+const publicPlaceholders = [
+  ['/cart', 'Cart'],
+  ['/checkout', 'Checkout'],
+  ['/track-order', 'Track order'],
+]
+/* Legal pages render owner-published CMS content, or say plainly that it has not
+   been published. Registered so the footer's links resolve rather than 404. */
+const legalRoutes = [
+  ['/privacy', 'Privacy policy', 'privacy'],
+  ['/terms', 'Terms and conditions', 'terms'],
 ]
 const customerRoutes = [
   ['/account', 'Account'], ['/account/orders', 'Orders'], ['/account/orders/:id', 'Order'],
@@ -23,16 +37,44 @@ const adminRoutes = [
 ]
 
 export function App() {
-  return <Routes>
-    <Route element={<PublicLayout />}>
-      {publicRoutes.map(([path, title]) => <Route key={path} path={path} element={<PlaceholderPage title={title} />} />)}
-    </Route>
-    <Route element={<RequireAuth><CustomerLayout /></RequireAuth>}>
-      {customerRoutes.map(([path, title]) => <Route key={path} path={path} element={<PlaceholderPage title={title} />} />)}
-    </Route>
-    <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
-      {adminRoutes.map(([path, title]) => <Route key={path} path={path} element={<PlaceholderPage title={`Admin: ${title}`} />} />)}
-    </Route>
-    <Route path="*" element={<NotFoundPage />} />
-  </Routes>
+  return (
+    <Routes>
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/shop" element={<ShopPage />} />
+        <Route path="/shop/:category" element={<ShopPage />} />
+        <Route path="/product/:slug" element={<ProductDetailPage />} />
+        <Route path="/services" element={<ServicesPage />} />
+        <Route path="/services/:slug" element={<ServiceDetailPage />} />
+        <Route path="/work" element={<WorkPage />} />
+        <Route path="/work/:slug" element={<ProjectDetailPage />} />
+        <Route path="/custom-project" element={<CustomProjectPage />} />
+        <Route path="/quote" element={<CustomProjectPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        {publicPlaceholders.map(([path, title]) => (
+          <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
+        ))}
+        {legalRoutes.map(([path, title, section]) => (
+          <Route key={path} path={path} element={<LegalPage title={title} section={section} />} />
+        ))}
+        {/* Internal only: absent from the production bundle. */}
+        {import.meta.env.DEV && <Route path="/internal/style-preview" element={<StylePreviewPage />} />}
+      </Route>
+
+      <Route element={<RequireAuth><CustomerLayout /></RequireAuth>}>
+        {customerRoutes.map(([path, title]) => (
+          <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
+        ))}
+      </Route>
+
+      <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
+        {adminRoutes.map(([path, title]) => (
+          <Route key={path} path={path} element={<PlaceholderPage title={`Admin: ${title}`} />} />
+        ))}
+      </Route>
+
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  )
 }

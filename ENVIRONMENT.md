@@ -12,6 +12,7 @@ Copy `.env.example` to `.env` for local development. `.env` is ignored by Git. V
 | `NEON_AUTH_JWKS_URL` | JWT verification keys endpoint | Server-only | API runtime `.env` | secure API/Neon runtime only |
 | `NEON_AUTH_ISSUER` | Expected Neon Auth token issuer | Server-only | API runtime `.env` | secure API/Neon runtime only |
 | `API_ALLOWED_ORIGINS` | Comma-separated permitted frontend origins | Server-only | API runtime `.env` | secure API/Neon runtime only |
+| `API_TRUSTED_CLIENT_HEADER` | Header the API runtime overwrites with the real client address, used as the rate-limit identity. **Required in production** — the server refuses to start without it when `NODE_ENV=production`. Never name a header a client can forge. | Server-only | API runtime `.env` (may be blank) | secure API/Neon runtime only |
 | `API_REQUEST_TIMEOUT_MS` | Upstream request timeout | Server-only | API runtime `.env` | secure API/Neon runtime only |
 | `API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_MAX_REQUESTS` | Rate-limit policy settings | Server-only | API runtime `.env` | secure API/Neon runtime only |
 | `API_RATE_LIMIT_MAX_KEYS` | Maximum in-memory fallback rate-limit buckets | Server-only | API runtime `.env` | secure API/Neon runtime only |

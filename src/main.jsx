@@ -5,6 +5,7 @@ import { App } from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ToastProvider'
+import { SiteContentProvider } from './content/SiteContentProvider'
 import { assertRuntimeConfig } from './config/env'
 import './styles.css'
 
@@ -15,7 +16,9 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
-          <BrowserRouter><App /></BrowserRouter>
+          <SiteContentProvider>
+            <BrowserRouter><App /></BrowserRouter>
+          </SiteContentProvider>
         </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>

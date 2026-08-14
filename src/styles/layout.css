@@ -1,0 +1,120 @@
+/* Containers, grids and section rhythm.
+   Asymmetry here is explicit and named, never accidental. */
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.container--narrow { max-width: var(--container-narrow); }
+.container--wide { max-width: var(--container-wide); }
+
+/* Full-bleed: escapes the container to the viewport edge. Used sparingly, for
+   installation photography and the occasional inverse band. */
+.bleed {
+  width: 100vw;
+  max-width: 100vw;
+  margin-inline: calc(50% - 50vw);
+}
+
+.section { padding-block: var(--section-gap); }
+.section--tight { padding-block: var(--section-gap-tight); }
+.section--flush-top { padding-block-start: 0; }
+.section--alt { background: var(--bg-alt); }
+.section--inverse {
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
+  --text: var(--text-inverse);
+  --text-muted: #a8adb6;
+  --border: var(--border-inverse);
+  --border-strong: #3d434c;
+  /* On near-black the darkened accent would disappear; the lighter step carries
+     the brand colour at 6.4:1 instead. */
+  --text-accent: var(--blue-500);
+}
+
+/* Section header: eyebrow + heading left-aligned, optional action pushed right.
+   Deliberately not centred — centred heading stacks are the template tell. */
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-block-end: var(--space-6);
+  padding-block-end: var(--space-4);
+  border-block-end: var(--border-width) solid var(--border);
+}
+.section-head__text { display: grid; gap: var(--space-3); max-width: 44rem; }
+
+/* ── Grids ──────────────────────────────────────────────────────────────── */
+
+.grid { display: grid; gap: var(--grid-gap); }
+
+/* Product listings: 2 up on phones so the catalogue reads as a catalogue,
+   not a single-file scroll. */
+.grid--products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 48rem) { .grid--products { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 72rem) { .grid--products { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.grid--categories { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 60rem) { .grid--categories { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.grid--pair { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 48rem) { .grid--pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.grid--trio { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 48rem) { .grid--trio { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Editorial split: text column beside media, weighted rather than 50/50. */
+.split {
+  display: grid;
+  gap: var(--grid-gap);
+  align-items: start;
+}
+@media (min-width: 62rem) {
+  .split { grid-template-columns: 5fr 7fr; gap: clamp(2rem, 4vw, 5rem); }
+  .split--reverse { grid-template-columns: 7fr 5fr; }
+  .split--reverse > :first-child { order: 2; }
+  .split__sticky { position: sticky; top: calc(var(--header-height) + var(--space-6)); }
+}
+
+/* Feature row: one large project beside a stack of smaller ones. */
+.feature-row { display: grid; gap: var(--grid-gap); }
+@media (min-width: 62rem) {
+  .feature-row { grid-template-columns: 3fr 2fr; align-items: start; }
+  .feature-row__aside { display: grid; gap: var(--grid-gap); }
+}
+
+/* Offset column — controlled asymmetry for prose that should not start at the
+   page edge. Collapses entirely on small screens. */
+@media (min-width: 62rem) {
+  .offset-start { margin-inline-start: 8.333%; }
+  .offset-end { margin-inline-end: 8.333%; }
+}
+
+.stack { display: grid; gap: var(--space-4); }
+.stack--sm { gap: var(--space-2); }
+.stack--lg { gap: var(--space-6); }
+.cluster { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.cluster--between { justify-content: space-between; }
+
+.rule { border-block-start: var(--border-width) solid var(--border); }
+
+/* Portfolio grid — a 6-column bed on desktop so items can take genuinely
+   different widths. On phones everything is a single column, which is the
+   correct reading order for image-led content. */
+.work-grid { display: grid; gap: var(--grid-gap) var(--grid-gap); grid-template-columns: 1fr; }
+@media (min-width: 48rem) {
+  .work-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .work-grid__item--full { grid-column: span 6; }
+  .work-grid__item--two-thirds { grid-column: span 4; }
+  .work-grid__item--half { grid-column: span 3; }
+  .work-grid__item--third { grid-column: span 2; }
+}
+/* A full-width item after a row of smaller ones gets extra air above it, so the
+   rhythm breaks deliberately rather than looking like a spacing mistake. */
+@media (min-width: 48rem) {
+  .work-grid__item--full:not(:first-child) { margin-block-start: var(--space-5); }
+}

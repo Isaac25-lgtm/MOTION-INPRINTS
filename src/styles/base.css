@@ -1,0 +1,159 @@
+/* Element defaults and the typography scale. Classes here are the only place
+   type styles are defined; components compose them rather than restating sizes. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--size-body);
+  line-height: var(--leading-normal);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: var(--selection-bg); }
+
+h1, h2, h3, h4, h5, h6, p, figure, blockquote { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+img, picture, video, canvas, svg { display: block; max-width: 100%; }
+input, button, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: none; padding: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+hr { border: none; border-top: var(--border-width) solid var(--border); margin: 0; }
+
+/* One focus treatment site-wide. Visible, high contrast, never removed. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 100;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
+  transform: translateY(-200%);
+  transition: transform var(--duration) var(--ease);
+}
+.skip-link:focus { transform: translateY(0); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Type styles ───────────────────────────────────────────────────────────
+   Display uses the width axis rather than extra size: expanded and tight-tracked
+   reads as confident signage lettering rather than a blown-up web headline. */
+
+.t-display {
+  font-size: var(--size-display);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  font-weight: var(--weight-semibold);
+  font-stretch: 112%;
+  text-wrap: balance;
+}
+
+.t-h1 {
+  font-size: var(--size-h1);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-heading);
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.t-h2 {
+  font-size: var(--size-h2);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-heading);
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.t-h3 {
+  font-size: var(--size-h3);
+  line-height: 1.25;
+  letter-spacing: var(--tracking-heading);
+  font-weight: var(--weight-semibold);
+}
+
+.t-h4 {
+  font-size: var(--size-h4);
+  line-height: 1.35;
+  font-weight: var(--weight-semibold);
+}
+
+/* Kicker. Small, wide-tracked, uppercase — carries section identity so headings
+   do not have to be oversized to signal importance. */
+.t-eyebrow {
+  font-size: var(--size-eyebrow);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}
+.t-eyebrow--accent { color: var(--text-accent); }
+
+.t-body-lg { font-size: var(--size-body-lg); line-height: var(--leading-relaxed); }
+.t-body { font-size: var(--size-body); line-height: var(--leading-relaxed); }
+.t-body-sm { font-size: var(--size-body-sm); line-height: var(--leading-normal); }
+.t-caption { font-size: var(--size-caption); line-height: var(--leading-normal); color: var(--text-muted); }
+
+/* Editorial serif, reserved for project captions and pull quotes. */
+.t-editorial {
+  font-family: var(--font-serif);
+  font-size: clamp(1.25rem, 1rem + 1.1vw, 1.75rem);
+  line-height: 1.35;
+  font-weight: var(--weight-regular);
+}
+
+.t-nav {
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.005em;
+}
+
+/* Price sits at body weight with tabular figures so columns align in listings. */
+.t-price {
+  font-size: var(--size-body);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.t-price--quote {
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+/* Product metadata: SKU, lead time, dimensions. */
+.t-meta {
+  font-size: var(--size-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-label {
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
+}
+
+.t-muted { color: var(--text-muted); }
+.t-measure { max-width: 62ch; }

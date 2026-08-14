@@ -16,6 +16,10 @@
 - Added a SPA rewrite for Render and ignored all local `.env` files except the safe example.
 - Made production API configuration explicit rather than routing API traffic through Render's static SPA fallback.
 - Added atomic status/history updates, strict numeric pagination, missing profile/project routes, and the remaining planned admin management route foundations.
+- Gave the rate limiter a real per-client identity (`API_TRUSTED_CLIENT_HEADER`, else a per-session fingerprint) instead of pooling every visitor into one shared bucket, which would have limited the whole site as a single client. The server now refuses to start in production without that header configured.
+- Made admin `PATCH` genuinely partial. The shared schemas carried `.default()` values that survived `.partial()`, so any partial update silently reset `status` and `is_configurable`; defaults now belong to the create schemas only, and an empty patch returns `422` rather than writing.
+- Restricted `product_image`, `project_image`, and `website_asset` upload intents to administrators. Any signed-in customer could previously mint public-visibility objects; customers retain their own private artwork and proof uploads.
+- Scoped `PATCH /api/admin/content/:section` to a single `entry_key`, which previously overwrote every entry in the section with one value.
 
 ## REMAINING
 

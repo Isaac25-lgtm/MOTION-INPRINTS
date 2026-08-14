@@ -5,8 +5,9 @@ import { ApiError, parsePaging } from '../server/http.js'
 import { requireOwnership } from '../server/auth.js'
 import { validateUpload } from '../server/storage.js'
 import { productSchema, quoteRequestSchema, validate } from '../server/validation.js'
-import { createMemoryRateLimiter } from '../server/handler.js'
+import { createClientKeyResolver, createMemoryRateLimiter } from '../server/handler.js'
 import { createDatabaseClient } from '../server/db.js'
+import { serverConfig } from '../server/config.js'
 
 const silentLogger = { info() {}, error() {} }
 const request = (path, options) => new Request(`https://api.motion.test${path}`, options)
@@ -17,7 +18,33 @@ describe('backend access and input rules', () => {
     const db = { query: async (statement) => { expect(statement).toContain("status='published'"); return [{ slug: 'banner', name: 'Banner' }] } }
     const api = createApi({ db, logger: silentLogger })
     const result = await responseBody(await api(request('/api/products')))
-    expect(result.status).toBe(200); expect(result.data).toEqual([{ slug: 'banner', name: 'Banner' }])
+    // `image` resolves to null until object storage is provisioned; it is never a fabricated URL.
+    expect(result.status).toBe(200); expect(result.data).toEqual([{ slug: 'banner', name: 'Banner', image: null }])
+  })
+
+  it('filters and sorts public listings only through a fixed whitelist', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [] } }
+    const api = createApi({ db, logger: silentLogger })
+    await api(request('/api/products?category=signage&sort=price-asc'))
+    expect(seen[0].statement).toContain('ORDER BY p.starting_price ASC')
+    expect(seen[0].values).toEqual(['signage', 20, 0])
+    // An unknown sort falls back to the default rather than reaching the SQL string.
+    seen.length = 0
+    await api(request("/api/products?sort=name); DROP TABLE products;--"))
+    expect(seen[0].statement).toContain('ORDER BY p.published_at DESC')
+    expect(seen[0].statement).not.toContain('DROP TABLE')
+  })
+
+  it('escapes wildcards in search terms and ignores very short queries', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [] } }
+    const api = createApi({ db, logger: silentLogger })
+    const short = await responseBody(await api(request('/api/search?q=a')))
+    expect(short.data).toEqual({ term: 'a', products: [], services: [], projects: [] })
+    expect(seen).toHaveLength(0)
+    await api(request('/api/search?q=100%25'))
+    expect(seen[0].values[0]).toBe('%100\\%%')
   })
 
   it('uses the current Neon parameterized query API and transaction query API', async () => {
@@ -61,6 +88,10 @@ describe('backend access and input rules', () => {
   it('bounds and validates pagination rather than passing NaN to Postgres', () => {
     expect(parsePaging(new URL('https://motion.test/api/products?limit=abc&offset=-4'))).toEqual({ limit: 20, offset: 0 })
     expect(parsePaging(new URL('https://motion.test/api/products?limit=9000&offset=2'))).toEqual({ limit: 100, offset: 2 })
+    // An absent parameter must use the default page size. Number(null) is 0, which
+    // would otherwise pass the range check and clamp every listing to a single row.
+    expect(parsePaging(new URL('https://motion.test/api/products'))).toEqual({ limit: 20, offset: 0 })
+    expect(parsePaging(new URL('https://motion.test/api/products?limit='))).toEqual({ limit: 20, offset: 0 })
   })
 
   it('expires and bounds the in-memory rate-limit buckets', () => {
@@ -72,6 +103,65 @@ describe('backend access and input rules', () => {
     const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'auth-id', profile: { id: 'customer-id', role: 'customer' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Cards', slug: 'cards', pricingType: 'quote_only', quoteRequired: true }) })))
     expect(result.status).toBe(403); expect(result.error.code).toBe('admin_required')
+  })
+
+  it('separates rate-limit buckets per client instead of pooling every visitor', () => {
+    const resolve = createClientKeyResolver({ trustedClientHeader: 'x-real-ip' })
+    expect(resolve(request('/api/products', { headers: { 'x-real-ip': '203.0.113.5' } }))).toBe('client:203.0.113.5')
+    const first = resolve(request('/api/orders', { headers: { authorization: 'Bearer token-a' } }))
+    const second = resolve(request('/api/orders', { headers: { authorization: 'Bearer token-b' } }))
+    expect(first).not.toBe(second)
+    expect(first).not.toContain('token-a')
+    // Unidentifiable callers are not forced into one shared bucket, which would limit the whole site as a single client.
+    expect(resolve(request('/api/products'))).toBeNull()
+  })
+
+  it('refuses to start in production without a trusted client header', () => {
+    const base = { DATABASE_URL: 'x', NEON_AUTH_JWKS_URL: 'x', NEON_AUTH_ISSUER: 'x' }
+    expect(() => serverConfig({ ...base, NODE_ENV: 'production' })).toThrow(/API_TRUSTED_CLIENT_HEADER/)
+    expect(serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'X-Real-IP' }).trustedClientHeader).toBe('x-real-ip')
+  })
+
+  it('applies a partial admin PATCH without demanding every field', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'product-id', slug: 'cards', status: 'published' }] } }
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }) })))
+    expect(result.status).toBe(200)
+    expect(seen[0].statement).toContain('SET status=$1')
+    expect(seen[0].statement).not.toContain('name=')
+    expect(seen[0].values).toEqual(['published', '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d'])
+  })
+
+  it('rejects an admin PATCH that carries no fields', async () => {
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{}' })))
+    expect(result.status).toBe(422); expect(result.error.code).toBe('empty_update')
+  })
+
+  it('stops a customer from placing objects in public website buckets', async () => {
+    const storage = { createUploadUrl: async () => ({ url: 'signed' }) }
+    const db = { query: async () => [{ id: 'asset', object_key: 'k' }] }
+    const customer = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
+    const body = JSON.stringify({ filename: 'x.png', mimeType: 'image/png', byteSize: 100, purpose: 'product_image' })
+    const blocked = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
+    expect(blocked.status).toBe(403); expect(blocked.error.code).toBe('admin_required')
+    const admin = createApi({ db, storage, authenticate: async () => ({ authUserId: 'a', profile: { id: 'pa', role: 'admin' } }), logger: silentLogger })
+    const allowed = await responseBody(await admin(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
+    expect(allowed.status).toBe(201)
+    // Customers keep their own private artwork route.
+    const artwork = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork' }) })))
+    expect(artwork.status).toBe(201)
+  })
+
+  it('updates one content entry rather than every key in the section', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c', section: 'contact', entry_key: 'details' }] } }
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/content/contact', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entryKey: 'details', value: { phone: '' } }) })))
+    expect(result.status).toBe(200)
+    expect(seen[0].statement).toContain('WHERE section=$3 AND entry_key=$4')
+    expect(seen[0].values[3]).toBe('details')
   })
 
   it('defines cascading order items and quote-to-order integrity in the migration', async () => {

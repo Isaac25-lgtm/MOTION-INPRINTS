@@ -1,0 +1,374 @@
+/* Components. Rules of the system:
+   - not everything is a card; borders and spacing separate before containers do
+   - one shadow, only for overlays that genuinely float above the page
+   - hover is a few percent of movement, never a lift, glow, spin or bounce */
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.875rem;
+  padding: var(--space-3) var(--space-5);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.btn[disabled], .btn[aria-disabled='true'] { opacity: 0.45; pointer-events: none; }
+
+.btn--primary { background: var(--action-bg); color: var(--action-text); }
+.btn--primary:hover { background: var(--action-bg-hover); }
+
+.btn--accent { background: var(--action-accent); color: var(--text-inverse); }
+.btn--accent:hover { background: var(--action-accent-hover); }
+
+.btn--secondary { border-color: var(--border-strong); color: var(--text); background: transparent; }
+.btn--secondary:hover { border-color: var(--text); }
+
+/* Text button: an underline that moves, which is the whole interaction. */
+.btn--text {
+  min-height: 0;
+  padding: 0;
+  gap: var(--space-2);
+  border: none;
+  background: none;
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  border-block-end: var(--border-width) solid var(--border-strong);
+  padding-block-end: 2px;
+  border-radius: 0;
+  transition: border-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.btn--text:hover { border-color: var(--text); }
+.btn--text .arrow { transition: transform var(--duration) var(--ease); }
+.btn--text:hover .arrow { transform: translateX(3px); }
+
+.btn--icon {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition: background-color var(--duration) var(--ease);
+}
+.btn--icon:hover { background: var(--ink-100); }
+.section--inverse .btn--icon:hover { background: #22262d; }
+
+.btn--sm { min-height: 2.375rem; padding-inline: var(--space-4); font-size: var(--size-caption); }
+.btn--block { width: 100%; }
+
+/* ── Links ───────────────────────────────────────────────────────────────── */
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 0.22em;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color var(--duration) var(--ease);
+}
+.link:hover { text-decoration-color: currentColor; }
+
+/* ── Media frame ─────────────────────────────────────────────────────────── */
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--ink-100);
+  border-radius: var(--radius-sm);
+}
+.frame > img { width: 100%; height: 100%; object-fit: cover; }
+.frame--square { aspect-ratio: 1 / 1; }
+.frame--portrait { aspect-ratio: 3 / 4; }
+.frame--landscape { aspect-ratio: 4 / 3; }
+.frame--wide { aspect-ratio: 16 / 9; }
+.frame--tall { aspect-ratio: 2 / 3; }
+.frame--sharp { border-radius: 0; }
+
+/* Zoom lives on the image, so the frame edge stays crisp and nothing shifts layout. */
+.frame--zoom > img { transition: transform var(--duration-slow) var(--ease); }
+a:hover .frame--zoom > img,
+.card:hover .frame--zoom > img { transform: scale(var(--hover-image-scale)); }
+
+/* Placeholder shown wherever genuine Motion photography has not been supplied.
+   Deliberately plain and labelled: it must never be mistaken for real work. */
+.frame--placeholder {
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(135deg, var(--ink-100) 0 10px, var(--ink-050, #f4f5f7) 10px 20px);
+  border: var(--border-width) dashed var(--border-strong);
+}
+.frame--placeholder span {
+  font-size: var(--size-caption);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--ink-400);
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+}
+
+/* Three-image composition: the middle image drops so the row reads as a
+   composed spread rather than three equal thirds. Collapses on small screens. */
+@media (min-width: 48rem) {
+  .editorial-trio > :nth-child(2) { transform: translateY(var(--space-7)); }
+  .editorial-trio { padding-block-end: var(--space-7); }
+}
+
+/* ── Product card — no container, no shadow, no rounded box.
+   Image, name, descriptor, price. Separation comes from spacing alone. */
+
+.product { display: grid; gap: var(--space-3); }
+.product__body { display: grid; gap: var(--space-1); }
+.product__name { font-size: var(--size-body-sm); font-weight: var(--weight-medium); }
+.product:hover .product__name { text-decoration: underline; text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+.product__desc { font-size: var(--size-caption); color: var(--text-muted); }
+.product__price { margin-block-start: var(--space-1); }
+
+/* ── Project preview — imagery carries it; the caption is a single quiet line. */
+
+.project { display: grid; gap: var(--space-3); }
+.project__caption { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.project__title { font-size: var(--size-body); font-weight: var(--weight-medium); }
+.project:hover .project__title { text-decoration: underline; text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+.project__meta { font-size: var(--size-caption); color: var(--text-muted); }
+
+/* ── Category tile — a photograph with a name set on the page beneath it,
+   not a coloured box with an icon. */
+
+.category { display: grid; gap: var(--space-3); }
+.category__name { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-weight: var(--weight-medium); }
+.category__name .arrow { transition: transform var(--duration) var(--ease); color: var(--text-muted); }
+.category:hover .category__name .arrow { transform: translateX(4px); }
+
+/* ── Badge — flat, bordered, no pill unless it is a genuine status chip. */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.2rem var(--space-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--size-eyebrow);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}
+.badge--success { color: var(--state-success); border-color: currentColor; }
+.badge--warning { color: var(--state-warning); border-color: currentColor; }
+.badge--error { color: var(--state-error); border-color: currentColor; }
+.badge--accent { color: var(--blue-600); border-color: currentColor; }
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+.field { display: grid; gap: var(--space-2); }
+.field__label { font-size: var(--size-body-sm); font-weight: var(--weight-medium); }
+.field__hint { font-size: var(--size-caption); color: var(--text-muted); }
+.field__error { font-size: var(--size-caption); color: var(--state-error); }
+.field__optional { color: var(--text-muted); font-weight: var(--weight-regular); }
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  min-height: 2.875rem;
+  padding: var(--space-3);
+  background: var(--bg);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--size-body);
+  transition: border-color var(--duration) var(--ease);
+}
+.input:hover, .textarea:hover, .select:hover { border-color: var(--ink-400); }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--focus-ring); }
+.textarea { min-height: 8rem; resize: vertical; line-height: var(--leading-normal); }
+/* File inputs size their own button; a fixed height clips it. */
+.input[type='file'] { min-height: 0; padding: var(--space-2); font-size: var(--size-body-sm); }
+/* iOS zooms the page when a focused control is under 16px. */
+@media (max-width: 48rem) { .input, .textarea, .select { font-size: 1rem; } }
+.input[aria-invalid='true'], .textarea[aria-invalid='true'] { border-color: var(--state-error); }
+
+/* Chevron drawn as an SVG rather than assembled from two gradients — same mark,
+   without introducing gradients into a system that otherwise forbids them. */
+.select {
+  appearance: none;
+  padding-inline-end: var(--space-7);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5 6 6.5l5-5'/%3E%3C/svg%3E");
+  background-position: right var(--space-4) center;
+  background-size: 12px 8px;
+  background-repeat: no-repeat;
+}
+
+/* Radio/checkbox rendered as a bordered choice row — reads as a form control,
+   not as another rounded card. */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--duration) var(--ease), background-color var(--duration) var(--ease);
+}
+.choice:hover { border-color: var(--border-strong); }
+.choice:has(input:checked) { border-color: var(--text); background: var(--ink-100); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.choice input { accent-color: var(--blue-600); width: 1rem; height: 1rem; flex: none; }
+
+.quantity {
+  display: inline-flex;
+  align-items: stretch;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.quantity button {
+  width: 2.75rem;
+  min-height: 2.75rem;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  transition: background-color var(--duration) var(--ease);
+}
+.quantity button:hover { background: var(--ink-100); }
+.quantity input {
+  width: 3.25rem;
+  border: none;
+  border-inline: var(--border-width) solid var(--border-strong);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+}
+.quantity input::-webkit-outer-spin-button,
+.quantity input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+.quantity input[type='number'] { appearance: textfield; }
+
+/* ── Tabs — underline only, and only where content genuinely divides. */
+
+/* Horizontal scroll is contained here so the page body never scrolls sideways. */
+.tabs { display: flex; gap: var(--space-5); border-block-end: var(--border-width) solid var(--border); overflow-x: auto; scrollbar-width: thin; }
+.tabs button {
+  min-height: 2.75rem;
+  padding-block: var(--space-3);
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  white-space: nowrap;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-selected='true'] { color: var(--text); border-block-end-color: var(--text); }
+
+/* Filter row — plain text with an underline for the active item. No pills. */
+.filters { display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
+.filters button {
+  /* Text-only control, so the tap area comes from padding rather than a pill. */
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--size-body-sm);
+  color: var(--text-muted);
+  border-block-end: 2px solid transparent;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+.filters button:hover { color: var(--text); }
+.filters button[aria-pressed='true'] { color: var(--text); border-block-end-color: var(--text); font-weight: var(--weight-medium); }
+
+/* ── Overlays ────────────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 22 26 / 0.42);
+  z-index: 60;
+  animation: fade var(--duration) var(--ease);
+}
+.drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 61;
+  width: min(28rem, 100vw);
+  background: var(--bg);
+  box-shadow: var(--shadow-overlay);
+  display: flex;
+  flex-direction: column;
+  animation: slide-in var(--duration) var(--ease);
+}
+.drawer--start { inset-inline: 0 auto; }
+.drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--gutter);
+  border-block-end: var(--border-width) solid var(--border);
+}
+.drawer__body { flex: 1; overflow-y: auto; padding: var(--space-5) var(--gutter); }
+.drawer__foot { padding: var(--space-4) var(--gutter); border-block-start: var(--border-width) solid var(--border); }
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide-in { from { transform: translateX(4%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .scrim, .drawer { animation: none; }
+}
+
+/* ── Feedback states ─────────────────────────────────────────────────────── */
+
+.toasts {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: 80;
+  display: grid;
+  gap: var(--space-2);
+  max-width: min(24rem, calc(100vw - var(--space-8)));
+}
+.toast {
+  padding: var(--space-3) var(--space-4);
+  background: var(--ink-900);
+  color: var(--paper);
+  border-radius: var(--radius-sm);
+  font-size: var(--size-body-sm);
+  box-shadow: var(--shadow-overlay);
+}
+.toast.error { background: var(--state-error); }
+.toast.success { background: var(--state-success); }
+
+/* Empty and error states are bordered blocks, not illustrated cards. */
+.state {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-6);
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+.state--center { justify-items: center; text-align: center; }
+
+.skeleton {
+  background: var(--ink-100);
+  border-radius: var(--radius-sm);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* ── Breadcrumbs & pagination ────────────────────────────────────────────── */
+
+.breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--size-caption); color: var(--text-muted); }
+.breadcrumbs a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 0.2em; }
+.breadcrumbs [aria-current] { color: var(--text); }
+
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block-start: var(--space-5); border-block-start: var(--border-width) solid var(--border); }
