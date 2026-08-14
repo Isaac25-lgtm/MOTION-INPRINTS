@@ -9,13 +9,17 @@ npm install
 npm run dev     # http://localhost:5173
 npm run build
 npm test
+
+# Applies db/migrations/*.sql in order; needs DATABASE_URL in the environment.
+node db/migrate.js --dry-run
+node db/migrate.js
 ```
 
 ## Structure
 
 - `src/styles/` — design tokens and the CSS system. `tokens.css` is the single source of truth for colour, type, spacing, radius and motion.
 - `src/components/ui/` — the component library: buttons, media frames, cards, forms, states, overlays, navigation.
-- `src/pages/` — public pages. Customer and admin routes remain placeholders until their phase.
+- `src/pages/` — public pages plus the implemented customer quotation list and detail experience. Other customer/admin screens remain phased placeholders.
 - `src/layouts/` — header, footer, mobile drawer, search panel.
 - `src/content/` — CMS content provider; business copy and contact details come from the database, never from constants.
 - `src/services/` — API-only data access. No component talks to the backend directly.
@@ -26,6 +30,7 @@ npm test
 
 | File | Covers |
 | --- | --- |
+| `COMMERCE.md` | Pricing engine, cart, quotes, orders, payments |
 | `DESIGN_SYSTEM.md` | Art direction, tokens, typography, layout, motion |
 | `PHOTOGRAPHY.md` | Image sourcing rules and media treatments |
 | `VISUAL_REVIEW.md` | Mobile and art-direction audit findings |

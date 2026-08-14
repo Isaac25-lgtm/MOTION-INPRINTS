@@ -6,6 +6,7 @@ import { Drawer } from '../components/ui/Overlay'
 import { IconButton } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { useSiteContent, useContactDetails } from '../content/SiteContentProvider'
+import { useCart } from '../features/cart/CartProvider'
 
 export const primaryNav = [
   { to: '/shop', label: 'Shop' },
@@ -63,9 +64,11 @@ function MobileNav({ open, onClose, cartCount }) {
   )
 }
 
-export function SiteHeader({ cartCount = 0 }) {
+export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  // Cart count is global state, so the badge is correct on every page.
+  const { count: cartCount } = useCart()
 
   return (
     <>

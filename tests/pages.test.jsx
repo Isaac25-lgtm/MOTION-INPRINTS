@@ -65,6 +65,17 @@ describe('public pages render', () => {
     expect(custom).toContain('Start a custom project')
   })
 
+  it('carries a quote-only product configuration into the custom-project form', async () => {
+    const configuration = encodeURIComponent(JSON.stringify({ finish: 'matte', design_service: true }))
+    const html = await render(() => import('../src/pages/CustomProjectPage.jsx'), 'CustomProjectPage', {
+      path: `/custom-project?product=business-cards&productName=Business%20Cards&quantity=250&configuration=${configuration}`,
+    })
+    expect(html).toContain('Configuration to quote')
+    expect(html).toContain('Business Cards')
+    expect(html).toContain('Quantity: 250')
+    expect(html).toContain('finish: matte')
+  })
+
   it('states no verified business facts that were never supplied', async () => {
     const about = await render(() => import('../src/pages/AboutPage.jsx'), 'AboutPage')
     // Guards against the invented-credentials failure mode Prompt 4.5 prohibits.

@@ -6,6 +6,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ToastProvider'
 import { SiteContentProvider } from './content/SiteContentProvider'
+import { CartProvider } from './features/cart/CartProvider'
 import { assertRuntimeConfig } from './config/env'
 import './styles.css'
 
@@ -17,7 +18,9 @@ createRoot(document.getElementById('root')).render(
       <ToastProvider>
         <AuthProvider>
           <SiteContentProvider>
-            <BrowserRouter><App /></BrowserRouter>
+            <CartProvider>
+              <BrowserRouter><App /></BrowserRouter>
+            </CartProvider>
           </SiteContentProvider>
         </AuthProvider>
       </ToastProvider>

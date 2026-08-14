@@ -251,6 +251,83 @@ a:hover .frame--zoom > img,
 .quantity input::-webkit-inner-spin-button { appearance: none; margin: 0; }
 .quantity input[type='number'] { appearance: textfield; }
 
+/* ── Product configuration ───────────────────────────────────────────────── */
+
+.config-group__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 2.75rem;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width) solid var(--border);
+  text-align: start;
+}
+.config-group__toggle:hover { color: var(--text-accent); }
+
+/* The price sits in a bordered band rather than a floating card: it is the most
+   important number on the page and should read as part of the panel. */
+.price-panel {
+  padding-block: var(--space-4);
+  border-block: var(--border-width) solid var(--border);
+}
+.price-panel__total { font-size: var(--size-h2); letter-spacing: var(--tracking-heading); }
+.price-panel__breakdown { display: grid; gap: var(--space-1); margin-block-start: var(--space-3); }
+.price-panel__breakdown > div { display: flex; justify-content: space-between; gap: var(--space-4); font-size: var(--size-caption); color: var(--text-muted); }
+.price-panel__breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* ── Cart ────────────────────────────────────────────────────────────────── */
+
+.cart-line {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: var(--space-4);
+  padding-block: var(--space-5);
+  border-block-start: var(--border-width) solid var(--border);
+}
+@media (min-width: 48rem) { .cart-line { grid-template-columns: 7rem 1fr auto; align-items: start; } }
+.cart-line__body { display: grid; gap: var(--space-2); }
+.cart-line__config { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.cart-line__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.cart-line--invalid { opacity: 0.65; }
+.cart-line__notice { font-size: var(--size-caption); color: var(--state-error); }
+
+.summary {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+.summary__row { display: flex; justify-content: space-between; gap: var(--space-4); font-size: var(--size-body-sm); }
+.summary__row--total { padding-block-start: var(--space-3); border-block-start: var(--border-width) solid var(--border); font-size: var(--size-body); font-weight: var(--weight-semibold); }
+.summary__row dd, .summary__row span:last-child { font-variant-numeric: tabular-nums; }
+
+/* ── Quotation document ──────────────────────────────────────────────────── */
+
+.quote-document { padding-block: var(--space-7); display: grid; gap: var(--space-5); }
+.quote-document__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: start;
+  justify-content: space-between;
+  padding-block-end: var(--space-5);
+  border-block-end: 2px solid var(--text);
+}
+.quote-document__actions { padding-block-start: var(--space-5); border-block-start: var(--border-width) solid var(--border); }
+
+.quote-table { width: 100%; border-collapse: collapse; font-size: var(--size-body-sm); }
+.quote-table th, .quote-table td { text-align: start; padding: var(--space-3) var(--space-2); border-block-end: var(--border-width) solid var(--border); }
+.quote-table thead th { font-size: var(--size-eyebrow); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--text-muted); font-weight: var(--weight-semibold); }
+.quote-table td:last-child, .quote-table th:last-child,
+.quote-table td:nth-child(2), .quote-table td:nth-child(3) { text-align: end; font-variant-numeric: tabular-nums; }
+.quote-table tfoot th { text-align: end; font-weight: var(--weight-regular); color: var(--text-muted); }
+.quote-table__total th, .quote-table__total td { font-weight: var(--weight-semibold); color: var(--text); font-size: var(--size-body); border-block-end: none; }
+/* Tables are the one place horizontal scroll is acceptable — it stays inside. */
+@media (max-width: 40rem) { .quote-table { display: block; overflow-x: auto; } }
+
 /* ── Tabs — underline only, and only where content genuinely divides. */
 
 /* Horizontal scroll is contained here so the page body never scrolls sideways. */
@@ -372,3 +449,42 @@ a:hover .frame--zoom > img,
 .breadcrumbs [aria-current] { color: var(--text); }
 
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block-start: var(--space-5); border-block-start: var(--border-width) solid var(--border); }
+.catalogue-tools {
+  display: grid;
+  grid-template-columns: minmax(14rem, 28rem) auto;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+@media (max-width: 40rem) {
+  .catalogue-tools { grid-template-columns: 1fr; align-items: stretch; }
+}
+
+.account-list { border-block-start: 1px solid var(--line); }
+.account-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5);
+  padding-block: var(--space-5);
+  border-block-end: 1px solid var(--line);
+}
+@media (max-width: 36rem) {
+  .account-list__item { grid-template-columns: 1fr; }
+  .account-list__item > :last-child { justify-items: start !important; }
+}
+
+.artwork-uploader { padding-block: var(--space-3); }
+.upload-list { border-block-start: 1px solid var(--line); }
+.upload-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--line);
+}
+.upload-list progress { width: min(100%, 24rem); accent-color: var(--brand-primary); }
+@media (max-width: 34rem) {
+  .upload-list__item { grid-template-columns: 1fr; }
+}

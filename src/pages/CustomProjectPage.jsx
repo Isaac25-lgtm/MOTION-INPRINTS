@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Field, ChoiceGroup } from '../components/ui/Form'
 import { Breadcrumbs } from '../components/ui/Navigation'
@@ -9,16 +10,19 @@ import { fileService } from '../services/fileService'
 /* Project types drive progressive disclosure: each type declares only the extra
    questions it actually needs, so the first screen never asks for dimensions on a
    POS system or artwork on a website enquiry. */
+/* Each project type declares the questions it actually needs, so a website
+   enquiry is never asked for signage dimensions and a signage enquiry is never
+   asked about existing web hosting (Prompt 6.1). */
 const projectTypes = [
-  { value: 'signage', label: 'Signage', extras: ['dimensions', 'installation', 'artwork'] },
+  { value: 'signage', label: 'Signage', extras: ['dimensions', 'placement', 'installation', 'artwork'] },
   { value: 'branding', label: 'Branding', extras: ['artwork'] },
   { value: 'printing', label: 'Printing', extras: ['quantity', 'dimensions', 'artwork'] },
   { value: 'apparel', label: 'Apparel', extras: ['quantity', 'sizes', 'artwork'] },
-  { value: 'event', label: 'Event materials', extras: ['quantity', 'deadline', 'artwork'] },
+  { value: 'promotional', label: 'Promotional / display', extras: ['quantity', 'deadline', 'artwork'] },
   { value: 'decor', label: 'Wall décor', extras: ['dimensions', 'installation', 'artwork'] },
-  { value: 'website', label: 'Website', extras: ['references'] },
-  { value: 'ecommerce', label: 'E-commerce website', extras: ['references'] },
-  { value: 'pos', label: 'POS / business system', extras: ['references'] },
+  { value: 'website', label: 'Website', extras: ['businessType', 'features', 'existingSite', 'references'] },
+  { value: 'ecommerce', label: 'E-commerce website', extras: ['businessType', 'features', 'existingSite', 'references'] },
+  { value: 'pos', label: 'POS / business system', extras: ['businessType', 'features', 'references'] },
   { value: 'other', label: 'Something else', extras: [] },
 ]
 
@@ -26,17 +30,23 @@ const emptyForm = {
   projectType: '',
   description: '',
   dimensions: '',
+  placement: '',
   quantity: '',
   sizes: '',
   installation: '',
+  businessType: '',
+  features: '',
+  existingSite: '',
   references: '',
   completionDate: '',
+  preferredContact: '',
   contactName: '',
   contactEmail: '',
   contactPhone: '',
 }
 
 export function CustomProjectPage() {
+  const [searchParams] = useSearchParams()
   const notify = useToast()
   const [form, setForm] = useState(emptyForm)
   const [files, setFiles] = useState([])
@@ -44,6 +54,21 @@ export function CustomProjectPage() {
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [reference, setReference] = useState(null)
+
+  const productHandoff = useMemo(() => {
+    const slug = searchParams.get('product')?.trim().slice(0, 200)
+    if (!slug) return null
+    const name = searchParams.get('productName')?.trim().slice(0, 180) || slug.replace(/-/g, ' ')
+    const quantity = Math.max(1, Math.min(1_000_000, Number.parseInt(searchParams.get('quantity') || '1', 10) || 1))
+    let configuration = {}
+    try {
+      const parsed = JSON.parse(searchParams.get('configuration') || '{}')
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        configuration = Object.fromEntries(Object.entries(parsed).slice(0, 30).filter(([, value]) => ['string', 'number', 'boolean'].includes(typeof value)))
+      }
+    } catch { /* A malformed URL is treated as having no saved choices. */ }
+    return { slug, name, quantity, configuration }
+  }, [searchParams])
 
   const selected = projectTypes.find(type => type.value === form.projectType)
   const extras = selected?.extras || []
@@ -62,22 +87,19 @@ export function CustomProjectPage() {
     setFiles(chosen)
   }
 
-  /* The brief is assembled into the quote_requests record the backend already
-     accepts. Uploads are listed by name only until object storage is provisioned;
-     nothing pretends a file was stored. */
-  const buildBrief = () => {
-    const lines = [
-      `Project type: ${selected?.label || 'Not specified'}`,
-      form.description && `Description: ${form.description}`,
-      form.dimensions && `Dimensions: ${form.dimensions}`,
-      form.quantity && `Quantity: ${form.quantity}`,
-      form.sizes && `Size breakdown: ${form.sizes}`,
-      form.installation && `Installation: ${form.installation}`,
-      form.references && `References: ${form.references}`,
-      form.completionDate && `Preferred completion: ${form.completionDate}`,
-      files.length > 0 && `Files the customer intends to send: ${files.map(file => file.name).join(', ')}`,
-    ].filter(Boolean)
-    return lines.join('\n')
+  /* Type-specific answers are sent as a structured document, so the backend keeps
+     them queryable rather than buried in prose. Uploads are listed by name only
+     until object storage is provisioned; nothing pretends a file was stored. */
+  const buildAnswers = () => {
+    const answers = {}
+    for (const key of extras) if (form[key]) answers[key] = form[key]
+    if (files.length) answers.filesPending = files.map(file => file.name).join(', ')
+    if (productHandoff) {
+      answers.productSlug = productHandoff.slug
+      answers.productQuantity = productHandoff.quantity
+      answers.productConfiguration = JSON.stringify(productHandoff.configuration)
+    }
+    return answers
   }
 
   const submit = async (event) => {
@@ -87,10 +109,14 @@ export function CustomProjectPage() {
     setSubmitting(true)
     try {
       const result = await quoteService.submit({
+        projectType: form.projectType,
         contactName: form.contactName,
         contactEmail: form.contactEmail,
         contactPhone: form.contactPhone || undefined,
-        projectBrief: buildBrief(),
+        projectBrief: form.description,
+        desiredTimeline: form.completionDate || undefined,
+        preferredContact: form.preferredContact || undefined,
+        answers: buildAnswers(),
       })
       setReference(result.request_number)
       setForm(emptyForm)
@@ -136,6 +162,17 @@ export function CustomProjectPage() {
 
       <form className="section split" onSubmit={submit} noValidate>
         <div className="stack stack--lg split__sticky">
+          {productHandoff && (
+            <aside className="summary" aria-labelledby="quoted-product">
+              <p className="t-eyebrow">Configuration to quote</p>
+              <h2 className="t-h4" id="quoted-product">{productHandoff.name}</h2>
+              <p className="t-meta">Quantity: {productHandoff.quantity}</p>
+              {Object.entries(productHandoff.configuration).map(([key, value]) => (
+                <p className="t-meta" key={key}>{key.replace(/_/g, ' ')}: {value === true ? 'yes' : value === false ? 'no' : String(value)}</p>
+              ))}
+              <p className="t-caption">These choices will be attached to your request. You can add context in the project description.</p>
+            </aside>
+          )}
           <ChoiceGroup
             legend="What kind of project is it?"
             name="projectType"
@@ -174,8 +211,20 @@ export function CustomProjectPage() {
               {extras.includes('installation') && (
                 <Field label="Installation" value={form.installation} onChange={set('installation')} hint="Do you need us to mount or install it, and where?" optional />
               )}
+              {extras.includes('placement') && (
+                <Field label="Where will it go?" value={form.placement} onChange={set('placement')} hint="Indoors or outdoors, and roughly where on the building." optional />
+              )}
+              {extras.includes('businessType') && (
+                <Field label="What does the business do?" value={form.businessType} onChange={set('businessType')} optional />
+              )}
+              {extras.includes('features') && (
+                <Field as="textarea" label="What should it do?" value={form.features} onChange={set('features')} hint="For example: online payments, stock tracking, multiple branches." optional />
+              )}
+              {extras.includes('existingSite') && (
+                <Field label="Existing website or system" value={form.existingSite} onChange={set('existingSite')} hint="Paste the address if you have one." optional />
+              )}
               {extras.includes('references') && (
-                <Field as="textarea" label="Reference links" value={form.references} onChange={set('references')} hint="Existing sites or systems you like, or your current one." optional />
+                <Field as="textarea" label="Reference links" value={form.references} onChange={set('references')} hint="Existing sites or systems you like." optional />
               )}
 
               <Field label="Preferred completion date" type="date" value={form.completionDate} onChange={set('completionDate')} optional />

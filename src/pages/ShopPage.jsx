@@ -1,18 +1,20 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Frame } from '../components/ui/Media'
 import { ProductCard, ProjectCard } from '../components/ui/Cards'
-import { Price } from '../components/ui/Price'
 import { Async, EmptyState, SkeletonGrid, LoadingState, ErrorState } from '../components/ui/States'
 import { Breadcrumbs, FilterBar, Pagination } from '../components/ui/Navigation'
-import { QuantityControl } from '../components/ui/Form'
-import { useResource } from '../hooks/useResource'
+import { useDebounced, useResource } from '../hooks/useResource'
+import { useCart } from '../features/cart/CartProvider'
+import { useToast } from '../components/ToastProvider'
+import { ProductConfigurator } from '../features/products/ProductConfigurator'
 import { productService } from '../services/productService'
 import { projectService } from '../services/projectService'
 import { categoryService } from '../services/categoryService'
 
 const sorts = [
+  { value: 'featured', label: 'Featured' },
   { value: 'newest', label: 'Newest' },
   { value: 'name', label: 'A–Z' },
   { value: 'price-asc', label: 'Price ↑' },
@@ -23,12 +25,15 @@ const LIMIT = 24
 
 export function ShopPage() {
   const { category } = useParams()
-  const [sort, setSort] = useState('newest')
+  const [sort, setSort] = useState('featured')
+  const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
+  const query = useDebounced(search.trim(), 250)
+  useEffect(() => setOffset(0), [category])
   const categories = useResource(({ signal }) => categoryService.list({ signal }), [])
   const products = useResource(
-    ({ signal }) => productService.list({ category, sort, limit: LIMIT, offset }, { signal }),
-    [category, sort, offset],
+    ({ signal }) => productService.list({ category, sort, q: query, limit: LIMIT, offset }, { signal }),
+    [category, sort, query, offset],
   )
   const active = categories.data?.find(item => item.slug === category)
 
@@ -42,7 +47,17 @@ export function ShopPage() {
           : <p className="t-body-lg t-muted t-measure">Products that can be ordered directly. Anything made to measure is quoted instead.</p>}
       </div>
 
-      <div className="cluster cluster--between" style={{ paddingBlockEnd: 'var(--space-5)' }}>
+      <div className="catalogue-tools" style={{ paddingBlockEnd: 'var(--space-5)' }}>
+        <label className="field catalogue-tools__search">
+          <span className="field__label">Search products</span>
+          <input
+            className="input"
+            type="search"
+            value={search}
+            onChange={(event) => { setSearch(event.target.value); setOffset(0) }}
+            placeholder="Name or description"
+          />
+        </label>
         <FilterBar
           options={sorts}
           value={sort}
@@ -57,8 +72,10 @@ export function ShopPage() {
         errorTitle="Products could not be loaded"
         empty={(
           <EmptyState
-            title="No products listed yet"
-            description="The catalogue is populated from the admin area. Until products are added, request a quote and we will price your job directly."
+            title={query ? 'No products match that search' : 'No products listed yet'}
+            description={query
+              ? 'Try another product name or clear the search.'
+              : 'The catalogue is populated from the admin area. Until products are added, request a quote and we will price your job directly.'}
             action={<Button to="/quote" variant="secondary" size="sm">Request a quote</Button>}
           />
         )}
@@ -78,7 +95,10 @@ export function ShopPage() {
 
 export function ProductDetailPage() {
   const { slug } = useParams()
-  const [quantity, setQuantity] = useState(1)
+  const navigate = useNavigate()
+  const { add } = useCart()
+  const notify = useToast()
+  const [adding, setAdding] = useState(false)
   const state = useResource(({ signal }) => productService.getBySlug(slug, { signal }), [slug])
   const product = state.data
 
@@ -99,7 +119,18 @@ export function ProductDetailPage() {
   }
   if (!product) return null
 
-  const quoteOnly = product.quote_required || product.pricing_type === 'quote_only'
+  const gallery = [product.image, ...(product.gallery || []).map(item => item.image)].filter(Boolean)
+
+  const addToCart = ({ selection, quantity }) => {
+    setAdding(true)
+    try {
+      add(product, selection, quantity)
+      notify(`${product.name} added to your cart.`, 'success')
+      navigate('/cart')
+    } finally {
+      setAdding(false)
+    }
+  }
 
   return (
     <div className="container">
@@ -114,7 +145,16 @@ export function ProductDetailPage() {
       </div>
 
       <div className="section split">
-        <Frame src={product.image} alt={product.name} ratio="square" zoom={false} priority sizes="(min-width: 62rem) 42vw, 92vw" label="Product photograph pending" />
+        <div className="stack">
+          <Frame src={product.image} alt={product.name} ratio="square" zoom={false} priority sizes="(min-width: 62rem) 42vw, 92vw" label="Product photograph pending" />
+          {gallery.length > 1 && (
+            <div className="grid grid--trio">
+              {gallery.slice(1, 4).map((image, index) => (
+                <Frame key={image} src={image} alt={`${product.name}, view ${index + 2}`} ratio="square" zoom={false} sizes="(min-width: 62rem) 14vw, 30vw" />
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="stack stack--lg">
           <div className="stack">
@@ -123,34 +163,9 @@ export function ProductDetailPage() {
             {product.short_description && <p className="t-body-lg t-muted t-measure">{product.short_description}</p>}
           </div>
 
-          <Price
-            amount={product.starting_price}
-            currency={product.currency}
-            pricingType={product.pricing_type}
-            quoteRequired={product.quote_required}
-          />
-
-          {/* Configurable and quote-only items route to the quotation workflow rather
-              than pretending a cart price exists. */}
-          {quoteOnly ? (
-            <div className="stack">
-              <p className="t-body-sm t-muted t-measure">
-                This item is quoted individually — the price depends on size, material,
-                finishing and quantity.
-              </p>
-              <Button to="/custom-project" variant="primary">Request a quote</Button>
-            </div>
-          ) : (
-            <div className="stack">
-              <QuantityControl value={quantity} onChange={setQuantity} />
-              <Button variant="primary" disabled aria-disabled="true">Add to cart</Button>
-              <p className="t-caption">
-                Ordering opens once checkout and payment are switched on. In the meantime,
-                request a quote and we will confirm price and lead time.
-              </p>
-              <Button to="/quote" variant="text" arrow>Request a quote</Button>
-            </div>
-          )}
+          {/* Configuration and price come from the backend; this page contains no
+              per-product fields and no client-side price arithmetic. */}
+          <ProductConfigurator product={product} onAddToCart={addToCart} adding={adding} />
 
           {product.description && (
             <div className="prose rule" style={{ paddingBlockStart: 'var(--space-5)' }}>
@@ -163,8 +178,33 @@ export function ProductDetailPage() {
               <div className="detail-list__row"><dt>Production time</dt><dd>{product.production_lead_time}</dd></div>
             </dl>
           )}
+
+          {product.specifications?.length > 0 && (
+            <section aria-labelledby="product-specifications">
+              <h2 className="t-h3" id="product-specifications">Specifications</h2>
+              <dl className="detail-list" style={{ marginBlockStart: 'var(--space-3)' }}>
+                {product.specifications.map(item => (
+                  <div className="detail-list__row" key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>
+                ))}
+              </dl>
+            </section>
+          )}
         </div>
       </div>
+
+      {product.related_products?.length > 0 && (
+        <section className="section rule" aria-labelledby="related-products">
+          <div className="section-head" style={{ marginBlockStart: 'var(--space-7)' }}>
+            <div className="section-head__text">
+              <p className="t-eyebrow">Continue browsing</p>
+              <h2 className="t-h2" id="related-products">Related products</h2>
+            </div>
+          </div>
+          <div className="grid grid--products">
+            {product.related_products.map(item => <ProductCard key={item.id} product={item} />)}
+          </div>
+        </section>
+      )}
 
       <Async state={related} skeleton={null} empty={null} errorTitle={null}>
         {(items) => (

@@ -11,12 +11,14 @@ import { AboutPage } from './pages/AboutPage'
 import { ContactPage } from './pages/ContactPage'
 import { CustomProjectPage } from './pages/CustomProjectPage'
 import { LegalPage } from './pages/LegalPage'
+import { CartPage } from './pages/CartPage'
+import { CheckoutPage, OrderConfirmedPage } from './pages/CheckoutPage'
+import { QuoteViewPage } from './pages/QuoteViewPage'
+import { AccountQuotesPage } from './pages/AccountQuotesPage'
 import { StylePreviewPage } from './pages/StylePreviewPage'
 
 /* Routes still awaiting their own phase keep the placeholder page. */
 const publicPlaceholders = [
-  ['/cart', 'Cart'],
-  ['/checkout', 'Checkout'],
   ['/track-order', 'Track order'],
 ]
 /* Legal pages render owner-published CMS content, or say plainly that it has not
@@ -27,7 +29,7 @@ const legalRoutes = [
 ]
 const customerRoutes = [
   ['/account', 'Account'], ['/account/orders', 'Orders'], ['/account/orders/:id', 'Order'],
-  ['/account/quotes', 'Quotes'], ['/account/profile', 'Profile'],
+  ['/account/profile', 'Profile'],
 ]
 const adminRoutes = [
   ['/admin', 'Dashboard'], ['/admin/products', 'Products'], ['/admin/categories', 'Categories'],
@@ -44,6 +46,10 @@ export function App() {
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/shop/:category" element={<ShopPage />} />
         <Route path="/product/:slug" element={<ProductDetailPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/order-confirmed/:reference" element={<OrderConfirmedPage />} />
+        <Route path="/quote/:id" element={<QuoteViewPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/services/:slug" element={<ServiceDetailPage />} />
         <Route path="/work" element={<WorkPage />} />
@@ -63,6 +69,8 @@ export function App() {
       </Route>
 
       <Route element={<RequireAuth><CustomerLayout /></RequireAuth>}>
+        <Route path="/account/quotes" element={<AccountQuotesPage />} />
+        <Route path="/account/quotes/:id" element={<QuoteViewPage account />} />
         {customerRoutes.map(([path, title]) => (
           <Route key={path} path={path} element={<PlaceholderPage title={title} />} />
         ))}

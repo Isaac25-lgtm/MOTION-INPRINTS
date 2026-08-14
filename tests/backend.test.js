@@ -36,6 +36,16 @@ describe('backend access and input rules', () => {
     expect(seen[0].statement).not.toContain('DROP TABLE')
   })
 
+  it('supports catalogue search and Featured ordering without exposing SQL input', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [] } }
+    const api = createApi({ db, logger: silentLogger })
+    await api(request('/api/products?sort=featured&q=100%25_cards'))
+    expect(seen[0].statement).toContain('ORDER BY p.is_featured DESC')
+    expect(seen[0].statement).toContain("ILIKE $1 ESCAPE")
+    expect(seen[0].values[0]).toBe('%100\\%\\_cards%')
+  })
+
   it('escapes wildcards in search terms and ignores very short queries', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [] } }
@@ -70,9 +80,20 @@ describe('backend access and input rules', () => {
 
   it('accepts a valid quote request and never invents a price', async () => {
     const seen = []
-    const api = createApi({ db: { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'q', request_number: 'QR-1', status_code: 'submitted' }] } }, logger: silentLogger })
+    const api = createApi({ db: { query: async (statement, values) => {
+      seen.push({ statement, values })
+      // The reference generator probes for a collision first; an empty result
+      // means the candidate reference is free.
+      if (statement.startsWith('SELECT 1 FROM')) return []
+      return [{ id: 'q', request_number: 'MOT-Q-K7P2QX', status_code: 'submitted' }]
+    } }, logger: silentLogger })
     const result = await responseBody(await api(request('/api/quote-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contactName: 'Ada Client', contactEmail: 'ada@example.com', projectBrief: 'A clear request for branded signage.' }) })))
-    expect(result.status).toBe(201); expect(seen[0].statement).toContain('INSERT INTO public.quote_requests'); expect(JSON.stringify(seen[0].values)).not.toContain('price')
+    expect(result.status).toBe(201)
+    const insert = seen.find(call => call.statement.includes('INSERT INTO public.quote_requests'))
+    expect(insert).toBeDefined()
+    expect(JSON.stringify(insert.values)).not.toContain('price')
+    // The reference is random, not sequential, and carries no timestamp.
+    expect(result.data.request_number).toMatch(/^MOT-Q-/)
   })
 
   it('rejects invalid prices and quantities', () => {
@@ -140,18 +161,39 @@ describe('backend access and input rules', () => {
   })
 
   it('stops a customer from placing objects in public website buckets', async () => {
-    const storage = { createUploadUrl: async () => ({ url: 'signed' }) }
-    const db = { query: async () => [{ id: 'asset', object_key: 'k' }] }
+    const storage = { createUploadUrl: async () => ({ url: 'signed', method: 'PUT' }) }
+    const db = {
+      query: async () => [{ id: 'owned-order-item', object_key: 'k' }],
+      transaction: async (build) => Promise.all(build({ query: async () => [] })),
+    }
     const customer = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
     const body = JSON.stringify({ filename: 'x.png', mimeType: 'image/png', byteSize: 100, purpose: 'product_image' })
     const blocked = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
     expect(blocked.status).toBe(403); expect(blocked.error.code).toBe('admin_required')
+    const fakeProof = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'proof.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'design_proof' }) })))
+    expect(fakeProof.status).toBe(403)
     const admin = createApi({ db, storage, authenticate: async () => ({ authUserId: 'a', profile: { id: 'pa', role: 'admin' } }), logger: silentLogger })
     const allowed = await responseBody(await admin(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
     expect(allowed.status).toBe(201)
     // Customers keep their own private artwork route.
-    const artwork = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork' }) })))
+    const artwork = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork', orderItemId: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d' }) })))
     expect(artwork.status).toBe(201)
+  })
+
+  it('does not create an artwork row when signed storage is unavailable', async () => {
+    const seen = []
+    const db = {
+      query: async (statement) => { seen.push(statement); return [{ id: 'owned' }] },
+      transaction: async () => { throw new Error('transaction must not start') },
+    }
+    const storage = { createUploadUrl: async () => { throw new ApiError(501, 'storage_not_configured', 'Storage unavailable.') } }
+    const api = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
+    const response = await responseBody(await api(request('/api/files/upload-intent', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork', orderItemId: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d' }),
+    })))
+    expect(response.status).toBe(501)
+    expect(seen.some(statement => statement.includes('INSERT INTO public.media_assets'))).toBe(false)
   })
 
   it('updates one content entry rather than every key in the section', async () => {
@@ -160,8 +202,50 @@ describe('backend access and input rules', () => {
     const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/content/contact', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entryKey: 'details', value: { phone: '' } }) })))
     expect(result.status).toBe(200)
-    expect(seen[0].statement).toContain('WHERE section=$3 AND entry_key=$4')
-    expect(seen[0].values[3]).toBe('details')
+    expect(seen[0].statement).toContain('WHERE section = $8 AND entry_key = $9')
+    // status is the single source of truth; is_published is kept in step with it,
+    // so an administrator cannot publish content that stays invisible.
+    expect(seen[0].statement).toContain("is_published = (COALESCE($2, status) = 'published')")
+    // $6 section, $7 entry_key — scoped to one entry, not the whole section.
+    expect(seen[0].values[7]).toBe('contact')
+    expect(seen[0].values[8]).toBe('details')
+  })
+
+  it('clears a stale schedule when content is published immediately', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c' }] } }
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/content/announcement', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }),
+    })))
+    expect(result.status).toBe(200)
+    expect(seen[0].values[2]).toBe(true)
+    expect(seen[0].values[3]).toBeNull()
+    expect(seen[0].values[4]).toBe(true)
+    expect(seen[0].values[5]).toBeNull()
+  })
+
+  it('routes quote sending through the dedicated prepared-to-sent transition', async () => {
+    const seen = []
+    const db = { query: async (statement, values) => {
+      seen.push({ statement, values })
+      return [{ id: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', status_code: 'sent', currency: 'UGX' }]
+    } }
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d/send', { method: 'POST' })))
+    expect(result.status).toBe(200)
+    expect(result.data.accessToken).toBeTruthy()
+    expect(seen[0].statement).toContain("status_code='prepared'")
+    expect(seen[0].values[1]).toMatch(/^[0-9a-f]{64}$/)
+    expect(seen[0].values[1]).not.toBe(result.data.accessToken)
+  })
+
+  it('does not expose the legacy quote PATCH bypass', async () => {
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ statusCode: 'sent' }),
+    })))
+    expect(result.status).toBe(404)
   })
 
   it('defines cascading order items and quote-to-order integrity in the migration', async () => {
