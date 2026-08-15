@@ -1,7 +1,11 @@
 /* Site chrome and page-level compositions. */
 
+/* Desktop header trimmed 76px -> 64px. The logo is 36px and the icon buttons are
+   44px, so 64px still leaves 10px of breathing room above and below the tallest
+   element and no interactive target shrinks. Those 12px matter: they are spent
+   on getting the next section above the fold at 1366x768. */
 :root { --header-height: 4.25rem; }
-@media (min-width: 62rem) { :root { --header-height: 4.75rem; } }
+@media (min-width: 62rem) { :root { --header-height: 4rem; } }
 
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .app-shell > main { flex: 1; }
@@ -147,6 +151,14 @@
 
    Padding is intentionally near the space scale rather than --section-gap: the
    hero must not open with more air than the sections beneath it. */
+/* The rail and the hero share one warm sheet, closed by a stone hairline. That
+   hairline is the whole transition into "What we make" — no divider graphic, no
+   decorative panel. */
+.hero-zone {
+  background: var(--paper-warm);
+  border-block-end: var(--border-width) solid var(--stone);
+}
+
 .hero {
   position: relative;
   display: grid;
@@ -156,23 +168,32 @@
   padding-block: var(--space-6) var(--space-7);
 }
 @media (min-width: 62rem) {
-  .hero { padding-block: var(--space-7); gap: var(--space-5); }
+  /* Tightened from space-7/space-7 (48/48) and a space-5 gap. Measured at
+     1366x768 the old values pushed the actions to ~700px and left nothing of the
+     next section visible; this returns roughly 40px, which is what brings the
+     "What we make" heading above the fold. Spacious, not empty. */
+  .hero { padding-block: var(--space-6) var(--space-7); gap: var(--space-4); }
 }
 
-/* Centred, and held to a comfortable measure so the sentence breaks into two or
-   three lines rather than running the full container width. */
+/* Kicker: entirely neutral. Its colour was subtracted — see HomePage.jsx. */
+.hero__kicker { color: var(--text-muted); }
+
+/* Centred, and measured so the sentence lands on two lines at desktop widths
+   rather than three — a third line pushes the actions down and reads as filler
+   under a three-word headline.
+
+   The copy is 133 characters, which needs roughly 610px at 18px to break in two.
+   That is wider than the 46-52ch used for running prose, but this is a single
+   centred sentence rather than a body of text: two lines of 66ch scan faster
+   here than three of 52ch. Below the breakpoint it reverts to a normal reading
+   measure, because on a phone the same width would be edge-to-edge. */
 .hero__standfirst {
   max-width: 46ch;
   margin-inline: auto;
+  color: var(--text-muted);
 }
-
-/* Brand rule under the statement — a small deliberate mark of colour, and one of
-   only four places blue appears on this fold. */
-.hero__rule {
-  width: 4rem;
-  height: 4px;
-  background: var(--blue-600);
-  border-radius: var(--radius-sm);
+@media (min-width: 62rem) {
+  .hero__standfirst { max-width: 68ch; }
 }
 
 .hero__actions {
@@ -183,12 +204,18 @@
   margin-block-start: var(--space-2);
 }
 
-/* A short blue rule used to mark an important section without giving it a whole
-   coloured band. This is what emphasis looks like in the rebalanced system. */
+/* A short rule marking an important section without giving it a whole coloured
+   band. This is what emphasis looks like in the rebalanced system.
+
+   Terracotta rather than blue. It marks Custom Work — the one section that most
+   needed to stop being a bright blue wall — and moving it off blue gives the
+   editorial palette a second outing beyond the hero without adding any new
+   device. Blue stays where it identifies rather than decorates: the logo, focus
+   rings, links and the middle full stop. */
 .accent-rule {
   width: 3rem;
   height: 3px;
-  background: var(--blue-600);
+  background: var(--accent-terracotta);
   border-radius: var(--radius-sm);
 }
 /* Word-per-line display setting: "Design. Print. Brand." reads as three
@@ -198,7 +225,142 @@
    cascade at equal specificity, silently dropped the centring declared above.
    A `.hero__statement` rule sat beside it matching nothing at all. Both gone. */
 .hero__lines { display: grid; }
-.hero__lines span { display: block; }
+.hero__line { display: block; }
+
+/* The coloured full stops.
+ *
+ * Inline spans inside each word, so they sit on the baseline and inherit the
+ * display size, weight and tracking — punctuation that happens to be coloured,
+ * not three dots positioned near some text. Nothing here changes metrics, so
+ * removing the colour changes nothing about the setting.
+ *
+ * All three clear 3:1 against warm paper at display size, and terracotta and
+ * ochre clear 4.5:1 outright. Measured in tests/design-system.test.js.
+ *
+ * The stop is never the only signal: the word carries the meaning, and the
+ * sentence still ends in a full stop with colour disabled. */
+.hero__stop { color: var(--accent-terracotta); }
+.hero__stop--terracotta { color: var(--accent-terracotta); }
+.hero__stop--blue { color: var(--blue-600); }
+.hero__stop--ochre { color: var(--accent-ochre); }
+
+/* ── Production rail ─────────────────────────────────────────────────────────
+   Static disciplines; one small marker travels. See ProductionRail.jsx for why
+   this is not a marquee. */
+
+.rail {
+  border-block-end: var(--border-width) solid var(--stone);
+  font-size: var(--size-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.rail__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+}
+.rail__list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  /* Clipped rather than wrapped on narrow screens: the rail must never add a
+     second row, and must never make the page scroll sideways. */
+  overflow: hidden;
+  white-space: nowrap;
+}
+.rail__item { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* Registration marks — 5px squares, one per accent, used once each. */
+.rail__mark { width: 5px; height: 5px; flex: none; }
+.rail__mark--terracotta { background: var(--accent-terracotta); }
+.rail__mark--blue { background: var(--blue-600); }
+.rail__mark--ochre { background: var(--accent-ochre); }
+.rail__mark--olive { background: var(--accent-olive); }
+
+/* The runner's track is its own layer with zero height, so the marker cannot
+   affect layout no matter where it is in its travel. */
+.rail__track {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: var(--border-width);
+  pointer-events: none;
+}
+.rail__runner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.5rem;
+  height: var(--border-width);
+  background: var(--blue-600);
+  /* 11s total: ~7s travelling, the remainder held still off-frame. The pause is
+     the point — a marker that never rests turns into a loading bar. */
+  animation: rail-runner 11s var(--ease) infinite;
+  transform: translateX(-100%);
+}
+@keyframes rail-runner {
+  0%   { transform: translateX(-2.5rem); opacity: 0; }
+  6%   { opacity: 1; }
+  58%  { transform: translateX(calc(100vw + 2.5rem)); opacity: 1; }
+  64%  { transform: translateX(calc(100vw + 2.5rem)); opacity: 0; }
+  100% { transform: translateX(calc(100vw + 2.5rem)); opacity: 0; }
+}
+/* Stops while the visitor is reading or navigating the top of the page. */
+.rail:hover .rail__runner,
+.rail:focus-within .rail__runner { animation-play-state: paused; }
+
+@media (max-width: 48rem) {
+  /* Phones keep the disciplines but lose the runner: a moving mark on a small
+     screen is proportionally far more distracting, and the rail's job there is
+     simply to be a quiet index. */
+  .rail__track { display: none; }
+  .rail__list { gap: var(--space-4); }
+}
+
+/* ── Hero entrance ───────────────────────────────────────────────────────────
+   One pass, under a second, CSS only — no timers, no animation library, no
+   JavaScript deciding when text becomes visible.
+
+   Content is present and readable without this: the animation only moves
+   opacity and 6px of translation from a state that already occupies its final
+   space. If CSS fails, nothing is hidden. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero__kicker,
+  .hero__line,
+  .hero__standfirst,
+  .hero__actions {
+    animation: hero-enter 420ms var(--ease) backwards;
+  }
+  .hero__kicker    { animation-delay: 0ms; }
+  .hero__line      { animation-delay: calc(90ms + (var(--reveal-index) * 90ms)); }
+  .hero__standfirst { animation-delay: 380ms; }
+  .hero__actions   { animation-delay: 470ms; }
+}
+@keyframes hero-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Reduced motion: everything stops, and the composition still works.
+ *
+ * The token overrides collapse --duration to 1ms, but these two animations set
+ * their own literal timings, so they need switching off explicitly. The runner
+ * is removed rather than frozen mid-travel — a mark stranded halfway along the
+ * rule looks like a bug. What remains is a static rail of disciplines with four
+ * registration marks, which is the composition the rail was designed around;
+ * the movement was only ever a reward for noticing. */
+@media (prefers-reduced-motion: reduce) {
+  .rail__runner { animation: none; display: none; }
+  .hero__kicker,
+  .hero__line,
+  .hero__standfirst,
+  .hero__actions { animation: none; }
+}
 
 /* ── Process — a numbered typographic list, not a four-icon strip. */
 
@@ -231,13 +393,15 @@
 /* The footer closes every page, so it carries the brand rather than fading out
    into another off-white band. Deep blue keeps the whole site on one palette and
    gives the page a definite end. */
+/* Neutral near-black, not the Digital Solutions blue. The two were previously
+   the same token, so the page ended on two indistinguishable dark bands. */
 .footer {
-  background: var(--bg-brand-deep);
+  background: var(--bg-footer);
   color: var(--text-inverse);
   --text: var(--text-inverse);
-  --text-muted: var(--on-brand-deep-muted);
-  --border: rgb(255 255 255 / 0.16);
-  --border-strong: rgb(255 255 255 / 0.3);
+  --text-muted: var(--on-footer-muted);
+  --border: rgb(255 255 255 / 0.14);
+  --border-strong: rgb(255 255 255 / 0.28);
   --focus-ring: var(--blue-300);
 }
 .footer .wordmark__tag { color: var(--on-brand-deep-muted); border-inline-start-color: var(--border); }

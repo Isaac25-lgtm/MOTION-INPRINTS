@@ -120,6 +120,31 @@ describe('design system constraints', () => {
       [token('ink-500'), white, 4.5, 'muted text on white'],
       // Focus rings and borders are UI components: 3:1 is the requirement.
       [token('blue-600'), white, 3, 'focus ring on white'],
+
+      /* Supporting editorial palette. The hero sits on warm paper, so every
+         pairing that appears there is measured against it rather than white —
+         warm paper is darker, so passing on white proves nothing.
+
+         The requested terracotta (#A65F46) and ochre (#B58A38) measured 4.32:1
+         and 2.82:1 on warm paper; the second failed even the 3:1 large-text
+         floor. Both were moved to their nearest accessible neighbours, and both
+         now clear 4.5:1 — so a single token per accent serves the display
+         periods and any small label without a second variant. */
+      [token('ink-900'), token('paper-warm'), 4.5, 'headline on warm paper'],
+      [token('ink-body'), token('paper-warm'), 4.5, 'supporting copy on warm paper'],
+      [token('ink-body'), token('paper-soft'), 4.5, 'supporting copy on soft paper'],
+      [token('accent-terracotta'), token('paper-warm'), 4.5, 'terracotta full stop on warm paper'],
+      [token('accent-ochre'), token('paper-warm'), 4.5, 'ochre full stop on warm paper'],
+      [token('accent-olive'), token('paper-warm'), 4.5, 'olive accent on warm paper'],
+      /* The middle full stop is the brand blue itself and is set at display size,
+         where 3:1 applies. It is the one accent held to the large-text bar, so
+         that the recognisable Motion blue appears on the fold unmodified. */
+      [token('blue-600'), token('paper-warm'), 3, 'Motion blue full stop at display size'],
+
+      // The one dark content band, and the footer that must not duplicate it.
+      [white, token('bg-brand-deep'), 4.5, 'white text on the deep ink band'],
+      [white, token('bg-footer'), 4.5, 'white text in the footer'],
+      [token('on-footer-muted'), token('bg-footer'), 4.5, 'secondary text in the footer'],
     ]
 
     for (const [foreground, background, minimum, description] of pairings) {
@@ -205,6 +230,56 @@ describe('design system constraints', () => {
     const tokens = await read(join(root, 'styles/tokens.css'))
     expect(tokens).toContain('prefers-reduced-motion: reduce')
     expect(tokens).toMatch(/--hover-image-scale:\s*1;/)
+  })
+
+  /* The two animations on the homepage set their own literal timings, so the
+     token-level duration override does not reach them. They need switching off
+     explicitly, and the composition has to survive without them. */
+  it('disables the hero entrance and the rail runner under reduced motion', async () => {
+    const css = await read(join(root, 'styles/site.css'))
+
+    const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'))
+    expect(reduced, 'site.css declares no reduced-motion block').toBeTruthy()
+    expect(reduced, 'the travelling marker must stop').toMatch(/\.rail__runner\s*\{[^}]*animation:\s*none/)
+    expect(reduced, 'the hero entrance must not run').toMatch(/animation:\s*none/)
+
+    /* The entrance is gated behind no-preference rather than being applied and
+       then undone, so a reduced-motion visitor never has it applied at all. */
+    expect(css).toContain('@media (prefers-reduced-motion: no-preference)')
+
+    /* It may only move opacity and a few pixels: content must occupy its final
+       position from the start, so nothing reflows as it settles and nothing is
+       hidden if the animation never runs. */
+    const entrance = css.slice(css.indexOf('@keyframes hero-enter'))
+    expect(entrance).toMatch(/translateY\((\d|1\d)px\)/)
+    expect(entrance, 'no scaling, rotation or spring overshoot in the entrance')
+      .not.toMatch(/scale|rotate|cubic-bezier\([^)]*-/)
+  })
+
+  /* The rail sits at full page width above the hero and is the one element that
+     could plausibly introduce sideways scrolling. */
+  it('keeps the production rail from overflowing the page', async () => {
+    const css = await read(join(root, 'styles/site.css'))
+    const list = css.slice(css.indexOf('.rail__list'), css.indexOf('.rail__item'))
+    // Clipped rather than wrapped: it must never become a second row either.
+    expect(list).toMatch(/overflow:\s*hidden/)
+    expect(list).toMatch(/white-space:\s*nowrap/)
+
+    /* The marker is absolutely positioned inside a zero-height track, so however
+       far it travels it cannot widen the document. */
+    const track = css.slice(css.indexOf('.rail__track'), css.indexOf('.rail__runner'))
+    expect(track).toMatch(/position:\s*absolute/)
+  })
+
+  /* The accents must be semantic tokens, not hex sprinkled through component
+     CSS — otherwise the contrast test above measures values nothing uses. */
+  it('draws the hero full stops from the palette tokens', async () => {
+    const css = await read(join(root, 'styles/site.css'))
+    const stops = css.match(/\.hero__stop--[a-z]+\s*\{[^}]*\}/g) || []
+    expect(stops.length, 'expected three coloured full stops').toBe(3)
+    for (const rule of stops) {
+      expect(rule, `${rule} must use a token, not a raw colour`).toMatch(/var\(--(accent-[a-z]+|blue-600)\)/)
+    }
   })
 
   it('keeps hover movement to a few percent', async () => {

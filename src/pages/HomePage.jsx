@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button'
 import { ProductCard, ProjectCard, CategoryTile } from '../components/ui/Cards'
 import { Async, EmptyState, SkeletonGrid } from '../components/ui/States'
 import { Icon } from '../components/ui/Icon'
+import { ProductionRail } from '../features/home/ProductionRail'
 import { useResource } from '../hooks/useResource'
 import { productService } from '../services/productService'
 import { projectService } from '../services/projectService'
@@ -50,20 +51,47 @@ function Hero() {
   const headline = field('hero', 'default', 'headline')
   const standfirst = field('hero', 'default', 'standfirst')
 
+  /* The statement is built from data so the three periods stay in step with
+     their colours, and so the reveal order is a single list rather than three
+     hand-written elements drifting apart. Each period is a <span> inside the
+     word, not a separate positioned element — it sits on the baseline and
+     inherits the display metrics, so it reads as typography rather than as
+     three dots parked next to some text. */
+  const statement = [
+    { word: 'Design', accent: 'terracotta' },
+    { word: 'Print', accent: 'blue' },
+    { word: 'Brand', accent: 'ochre' },
+  ]
+
   return (
     <section className="hero container" aria-labelledby="hero-title">
-      <p className="t-eyebrow t-eyebrow--accent">Kampala · Design, print &amp; brand</p>
+      {/* Deliberately neutral. A small blue registration square sat here and was
+          removed in the subtraction pass: with a blue mark already in the rail
+          and a blue full stop in the headline, it was the third blue on one fold
+          and the only one carrying no meaning. The periods are the signature. */}
+      <p className="t-eyebrow hero__kicker">Kampala · Design, print &amp; brand</p>
+
       <h1 className="t-display hero__lines" id="hero-title">
-        {headline || <><span>Design.</span><span>Print.</span><span>Brand.</span></>}
+        {headline || statement.map(({ word, accent }, index) => (
+          <span className="hero__line" key={word} style={{ '--reveal-index': index }}>
+            {word}
+            {/* aria-hidden is wrong here: the full stop is real punctuation and
+                belongs in the accessible name. Only the colour is decorative. */}
+            <span className={`hero__stop hero__stop--${accent}`}>.</span>
+          </span>
+        ))}
       </h1>
-      <div className="hero__rule" aria-hidden="true" />
-      <p className="t-body-lg t-muted hero__standfirst">
-        {/* Fallback lists what Motion offers. It makes no claim about how the work
-            is produced — that is for the owner to state through the CMS. */}
-        {standfirst || 'Signage, commercial printing, promotional materials and branded apparel — plus the websites, online stores and point-of-sale systems that run alongside them.'}
+
+      <p className="t-body-lg hero__standfirst">
+        {/* Fallback describes what Motion offers. It makes no claim about how the
+            work is produced — that is for the owner to state through the CMS. */}
+        {standfirst || 'Signage, commercial print and branded products—supported by the websites, online stores and business systems that keep brands moving.'}
       </p>
+
       <div className="hero__actions">
-        <Button to="/shop" variant="accent">Shop products</Button>
+        {/* Ink, not blue. A saturated blue block was the loudest thing on the
+            fold and made the page read as corporate rather than editorial. */}
+        <Button to="/shop" variant="primary">Shop products</Button>
         <Button to="/custom-project" variant="secondary">Start a custom project</Button>
       </div>
     </section>
@@ -351,7 +379,12 @@ function ContactClose() {
 export function HomePage() {
   return (
     <>
-      <Hero />
+      {/* Sits between the header and the hero, on the same warm paper, so the
+          top of the page reads as one sheet rather than three stacked bands. */}
+      <div className="hero-zone">
+        <ProductionRail />
+        <Hero />
+      </div>
       <Categories />
       <SelectedWork />
       <FeaturedProducts />

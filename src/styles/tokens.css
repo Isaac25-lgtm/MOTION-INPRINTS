@@ -35,16 +35,44 @@
      text uses this darker step (5.9:1) so the brand colour never costs legibility. */
   --blue-text: #14547a;
 
+  /* ── SUPPORTING EDITORIAL PALETTE ─────────────────────────────────────────
+     Paper stocks and inks, not a digital colour scheme.
+
+     IMPORTANT: these are a supporting editorial palette chosen for this site.
+     They are NOT a claimed official Motion brand specification. Only
+     `--motion-blue-source` above has a documented provenance — extracted from
+     the supplied artwork. Everything below is a design decision that the owner
+     may overrule; do not present it to a printer as Motion's brand palette.
+
+     Every accent is set at a value that clears 4.5:1 on warm paper, so one
+     token serves both a display period and a small label and no call site has
+     to pick between a "display" and a "text" variant. The requested starting
+     points were:
+
+       terracotta #A65F46 -> 4.32:1 on warm paper, short of 4.5 for small text
+       ochre      #B58A38 -> 2.82:1, which fails even the 3:1 large-text floor
+       olive      #5F6850 -> 5.25:1, already safe and kept unchanged
+
+     Terracotta and ochre are therefore the nearest accessible neighbours rather
+     than the literal values. Measured in `tests/design-system.test.js`. */
+  --paper: #ffffff;
+  --paper-soft: #faf9f6;  /* barely-there warmth; the quiet default surface */
+  --paper-warm: #f5f2ec;  /* the hero surface, and alternating full-bleed bands */
+  --stone: #d8d2c8;       /* rules and dividers — decorative, never load-bearing */
+
+  --accent-terracotta: #a15c44;  /* 4.55:1 on warm paper */
+  --accent-ochre: #8a692b;       /* 4.54:1 on warm paper */
+  --accent-olive: #5f6850;       /* 5.25:1 on warm paper */
+
   /* Neutrals — warm-leaning, so photography of printed work sits naturally on them. */
-  --ink-900: #14161a;   /* near-black, primary text */
+  --ink-900: #121416;   /* ink black, primary text */
   --ink-700: #3a3f47;
-  --ink-500: #6b7280;   /* secondary text */
+  --ink-body: #65625e;  /* warm body grey — 5.43:1 on warm paper, 6.07:1 on white */
+  --ink-500: #6b7280;   /* cool secondary grey, retained for existing UI chrome */
   --ink-400: #8f96a1;
   --ink-300: #c3c8d0;
   --ink-200: #e2e5ea;   /* hairlines */
   --ink-100: #eef0f3;
-  --paper: #ffffff;
-  --paper-warm: #f7f5f2; /* warm off-white for alternating full-bleed bands */
 
   /* Semantic — used for state, never for decoration. */
   --state-error: #a3241f;
@@ -67,8 +95,15 @@
      5.19:1 while staying unmistakably the brand colour. The logo blue itself is
      unchanged and still used for marks, rules, focus rings and accents. */
   --bg-brand: #1b73a6;
-  --bg-brand-deep: var(--blue-800);
+  /* The one dark content moment on the homepage — Digital Solutions.
+     Deep ink blue rather than the old --blue-800 (#103f5c): still unmistakably
+     in the brand's hue family, but it reads as ink on a press rather than as a
+     large field of corporate blue, and it lifts white from 11.1:1 to 16.1:1. */
+  --bg-brand-deep: #12232e;
   --bg-brand-soft: var(--blue-050);
+  /* The footer closes the page and must not read as a second Digital Solutions
+     band. Deeper and neutral — no blue in it at all. */
+  --bg-footer: #0d0f11;
 
   /* Secondary text and hairlines as they appear ON each coloured surface. Held
      here rather than in the band rules so every colour in the system still has
@@ -80,8 +115,13 @@
      3.43:1 and failed. */
   --on-brand-muted: #eaf4fa;
   --on-brand-deep-muted: #a8cbe0;
+  /* Footer secondary text — warm grey rather than the blue-tinted muted above,
+     because the footer is neutral near-black and carries no blue. 6.6:1. */
+  --on-footer-muted: #9a9793;
   --text: var(--ink-900);
-  --text-muted: var(--ink-500);
+  /* Warm rather than the old cool grey: identical contrast, but it belongs to
+     paper rather than to a dashboard. */
+  --text-muted: var(--ink-body);
   --text-inverse: var(--paper);
   --text-accent: var(--blue-text);
   --border: var(--ink-200);

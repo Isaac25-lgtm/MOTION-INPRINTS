@@ -92,7 +92,10 @@ describe('public pages render', () => {
    * This test is what stops a fifth appearing quietly. */
   it('opens with a text-only hero carrying no visual media', async () => {
     const html = await render(() => import('../src/pages/HomePage.jsx'), 'HomePage')
-    const start = html.indexOf('class="hero')
+    /* Slice on the full class, not the `hero` prefix — `hero-zone` wraps both the
+       production rail and the hero, and matching the prefix would pull the rail
+       into every assertion below. */
+    const start = html.indexOf('class="hero container"')
     expect(start, 'hero section not found').toBeGreaterThan(-1)
     const hero = html.slice(start, html.indexOf('</section>', start))
 
@@ -103,15 +106,27 @@ describe('public pages render', () => {
     expect(hero).not.toContain('hero__media')
     expect(hero).not.toMatch(/background-image|linear-gradient|radial-gradient/)
 
-    // What must remain: statement, rule, standfirst, both actions.
-    expect(hero).toContain('Design.')
-    expect(hero).toContain('hero__rule')
+    /* The statement, read as a person or a screen reader receives it. The words
+       and their full stops are separate elements so each period can carry its
+       own colour, so matching raw markup would prove nothing — what matters is
+       that the accessible text is still "Design. Print. Brand." */
+    const text = hero.replace(/<[^>]+>/g, '')
+    expect(text).toContain('Design.')
+    expect(text).toContain('Print.')
+    expect(text).toContain('Brand.')
+
     expect(hero).toContain('hero__standfirst')
     expect(hero).toContain('Shop products')
     expect(hero).toContain('Start a custom project')
 
-    /* Removed: the tinted chip row, and the service list beneath the buttons
-       which duplicated the category section immediately below it. */
+    /* The hero primary action is ink, not brand blue. A saturated blue block was
+       the loudest thing on the fold. */
+    expect(hero, 'the hero primary action must be ink, not the accent blue').not.toContain('btn--accent')
+    expect(hero).toContain('btn--primary')
+
+    /* Removed: the blue underline, the tinted chip row, and the service list
+       beneath the buttons which duplicated the category section below it. */
+    expect(hero, 'the blue underline was replaced by the coloured full stops').not.toContain('hero__rule')
     expect(hero, 'the chip row must not return').not.toContain('hero__tag')
     expect(hero, 'the service list duplicated the section below').not.toContain('hero__makes')
 
@@ -119,6 +134,30 @@ describe('public pages render', () => {
     expect(html).not.toContain('Photography pending')
     expect(html).not.toContain('hero-specimen')
     expect(html).not.toMatch(/<img[^>]+src="https?:\/\//)
+  })
+
+  /* The hero's two permitted visual devices, and nothing else. */
+  it('gives each full stop its own accent, and keeps the rail decorative', async () => {
+    const html = await render(() => import('../src/pages/HomePage.jsx'), 'HomePage')
+
+    // One stop per accent, each used exactly once.
+    for (const accent of ['terracotta', 'blue', 'ochre']) {
+      const uses = html.match(new RegExp(`hero__stop--${accent}`, 'g')) || []
+      expect(uses.length, `expected exactly one ${accent} full stop, found ${uses.length}`).toBe(1)
+    }
+
+    /* The production rail is decorative: the disciplines it names are already
+       present as real links in the category section below, so announcing them
+       twice would add duplicate accessible text and no information. */
+    const railStart = html.indexOf('class="rail"')
+    expect(railStart, 'production rail not found').toBeGreaterThan(-1)
+    expect(html.slice(railStart, railStart + 60)).toContain('aria-hidden="true"')
+
+    // It precedes the hero, and carries no links or headings of its own.
+    expect(railStart).toBeLessThan(html.indexOf('class="hero container"'))
+    const rail = html.slice(railStart, html.indexOf('</div>', html.indexOf('rail__track')))
+    expect(rail, 'the rail must not introduce navigation').not.toContain('<a ')
+    expect(rail, 'the rail must not introduce headings').not.toMatch(/<h[1-6]/)
   })
 
   /* The whole point of shortening the hero: reaching the thing that sells. */
@@ -155,7 +194,8 @@ describe('public pages render', () => {
 
   it('renders the homepage with all eight sections', async () => {
     const html = await render(() => import('../src/pages/HomePage.jsx'), 'HomePage')
-    expect(html).toContain('Design.')
+    // Tag-stripped: the statement's full stops are separate coloured elements.
+    expect(html.replace(/<[^>]+>/g, '')).toContain('Design.')
     expect(html).toContain('Selected work')
     expect(html).toContain('Digital solutions')
     expect(html).toContain('Start a custom project')

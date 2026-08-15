@@ -34,6 +34,62 @@ Two lessons are now encoded in the system:
 
 `tests/pages.test.jsx` pins these corrections — it fails if the display cap rises above 3.5rem, if more than one saturated band appears in the page body, or if pale blue starts recurring as a background.
 
+## Supporting editorial palette
+
+Paper stocks and inks, not a digital colour scheme.
+
+**These are a supporting editorial palette chosen for this site. They are _not_ a claimed official Motion brand specification.** Only `--motion-blue-source` has documented provenance — extracted byte-level from the supplied artwork (see *Brand colour* below). Everything in this table is a design decision the owner may overrule, and none of it should be handed to a printer as Motion's brand palette.
+
+| Token | Value | Role | On warm paper |
+| --- | --- | --- | --- |
+| `--paper` | `#ffffff` | Category and catalogue sections | — |
+| `--paper-soft` | `#faf9f6` | Barely-there warmth | — |
+| `--paper-warm` | `#f5f2ec` | Hero surface, alternating bands | — |
+| `--stone` | `#d8d2c8` | Rules and dividers — decorative only | — |
+| `--ink-900` | `#121416` | Primary text | 16.5:1 |
+| `--ink-body` | `#65625e` | Supporting copy | 5.4:1 |
+| `--accent-terracotta` | `#a15c44` | "Design." full stop, Custom Work rule | 4.6:1 |
+| `--accent-ochre` | `#8a692b` | "Brand." full stop | 4.5:1 |
+| `--accent-olive` | `#5f6850` | Rail registration mark | 5.3:1 |
+| `--motion-blue-source` | `#1f80b9` | "Print." full stop, logo, focus, links | 3.9:1 |
+
+**Two requested values were moved.** Terracotta `#A65F46` measured 4.32:1 on warm paper — fine for a display period, short of 4.5:1 for any small label. Ochre `#B58A38` measured **2.82:1**, failing even the 3:1 large-text floor. Both were shifted to their nearest accessible neighbours, so a single token per accent now serves both a display period and a small label with no second variant.
+
+**Motion blue is unchanged at `#1f80b9`.** The brief cited `#2188BD`; the two differ by ~2.4 luminance points and are visually indistinguishable, and the extracted value has a documented derivation, so the verified one stands.
+
+### Colour allocation
+
+- **65–75%** white, soft paper, warm paper
+- **20–25%** ink black, warm grey, stone
+- **5–10%** all accents combined — and Motion blue is only one member of that allocation, not the whole of it
+
+Blue identifies; it does not decorate. It belongs to the logo, focus rings, links and one full stop. Terracotta, ochre and olive appear as small rules, indices and registration marks. **No accent takes a full-width band.**
+
+## Motion
+
+One-time, short, and never required. The design must be convincing with every animation disabled — motion rewards attention rather than supplying the interest.
+
+**Hero entrance.** Kicker, then the three words in sequence, then the supporting copy, then the actions. Total under one second. Only opacity and 6px of translation, from a position the content already occupies — nothing reflows as it settles, and if CSS never loads nothing is hidden. No typewriter, no bounce, no spring overshoot, no continuous animation.
+
+**Production rail.** The disciplines are **static**. One small registration marker travels left to right over ~7 seconds, then rests off-frame for ~4 before repeating. It lives in an absolutely-positioned zero-height track, so it cannot move layout by a pixel. It pauses on hover and focus, and is dropped entirely below 48rem.
+
+It is deliberately *not* a marquee — sliding text reads as a promotional ticker, which is the register this site avoids.
+
+**Reduced motion.** `prefers-reduced-motion: reduce` removes the runner and the entrance outright. The entrance is gated behind `no-preference` rather than applied and undone, so it never runs at all. What remains is a static rail of disciplines with registration marks — the composition the rail was designed around.
+
+## Why the hero has no image, and where photography belongs
+
+Four image treatments were tried and rejected on screen; the fourth was the best and still made the fold tall, front-loaded the page with blue and pushed category discovery below the viewport. The deeper problem is that stock workshop photography is always recognisably *somewhere else*, which undercuts a Kampala company.
+
+**Photography belongs in catalogue and portfolio content** — category tiles, product pages, project pages — where an image shows a specific thing that genuinely exists. A hero photograph is generic filler by construction: it illustrates nothing in particular and asserts something Motion may not have made.
+
+The hero carries exactly **two** visual devices and may never carry a third:
+
+1. the coloured full stops
+2. the narrow production rail
+
+If the rail ever competes with the headline, the fix is to remove its animation — not to make the headline louder.
+
 ## Section bands
 
 Target mix, by page area:
@@ -57,7 +113,9 @@ Target mix, by page area:
 
 There is exactly one saturated band in the whole site body — Digital Solutions — plus the footer. Two saturated bands may never sit adjacent, and pale blue is a sparing accent surface rather than a second recurring background.
 
-Homepage order: white hero → white categories → warm Selected Work → white products → warm Custom Work → **deep-blue Digital Solutions** → warm process → white contact → deep-blue footer.
+Homepage order: **warm-paper hero** → white categories → warm Selected Work → white products → warm Custom Work → **deep ink-blue Digital Solutions** → warm process → white contact → **near-black footer**.
+
+Two changes from the previous rhythm. The hero moved off clinical white onto warm paper, closed by a stone hairline that is the whole transition into "What we make" — no divider graphic. And the footer left `--bg-brand-deep`: it and Digital Solutions were literally the same token, so the page ended on two indistinguishable dark bands. Digital Solutions is now deep ink-blue `#12232e` (still the brand's hue family, but ink rather than corporate blue, and white lifts from 11.1:1 to 16.1:1); the footer is neutral near-black `#0d0f11` with no blue in it.
 
 Emphasis without a coloured field: a marked eyebrow (`.t-eyebrow--accent`), a short blue rule (`.accent-rule`), the accent button, and layout weight. That is how Custom Work is emphasised — it was a full blue band, which put two saturated sections in a row and turned colour into a layout habit.
 

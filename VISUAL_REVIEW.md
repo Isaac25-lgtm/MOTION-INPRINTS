@@ -56,6 +56,24 @@ Underneath all four sat a structural problem: nearly every stock workshop photog
 
 Sourcing throughout was verified per-asset, not per-search-page: **four of nine Unsplash candidates were rejected** — three Unsplash+ (paid Getty tier, surfaced inside free results), one showing a third-party brand's advertisement — plus six Pexels candidates rejected for a competitor's logo on a wall, a direct-to-camera gaze that would imply endorsement, and clutter. Every candidate was downloaded and *looked at*; descriptions never surfaced the disqualifying detail.
 
+## Fifth pass — editorial character
+
+The hero was structurally right — centred, text-led, image-free — but it read as a generic white landing page. Blue was doing all the identifying work while carrying none of the character.
+
+| Was | Now |
+| --- | --- |
+| Clinical white hero surface | Warm paper `#f5f2ec`, closed by a stone hairline into "What we make" |
+| Short blue underline beneath the statement | Removed. Each full stop carries a colour instead: terracotta, Motion blue, ochre |
+| Primary action a saturated blue block | Ink black; blue kept for identity, not for the loudest object on the fold |
+| Digital Solutions and the footer on the **same** token | Digital Solutions deep ink-blue `#12232e`; footer neutral near-black `#0d0f11` |
+| Custom Work rule in blue | Terracotta — a second outing for the editorial palette, no new device |
+| Desktop header 76px | 64px; logo and 44px targets untouched |
+| Supporting copy on three lines | Two, at desktop widths |
+
+**Two visual devices, and a subtraction pass.** The coloured full stops and the production rail. A small blue registration square in the kicker was built and then removed: with a blue mark in the rail and a blue full stop in the headline it was the third blue on one fold and the only one carrying meaning. Removing it is what makes the periods unambiguously the signature.
+
+**Contrast forced two palette changes.** Terracotta `#A65F46` measured 4.32:1 on warm paper and ochre `#B58A38` measured **2.82:1** — the second failing even the 3:1 large-text floor. Both moved to their nearest accessible neighbours. The contrast test was extended, never relaxed.
+
 ## Fourth correction — colour rebalance
 
 | Was | Now |
