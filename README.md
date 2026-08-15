@@ -15,6 +15,28 @@ node db/migrate.js --dry-run
 node db/migrate.js
 ```
 
+### Making someone an administrator
+
+Everyone who signs up is a `customer`. There is no HTTP route, UI control or
+environment variable that grants `admin`, and no automatic "first user wins"
+rule — promotion needs a shell on the server and the database credential.
+
+```sh
+# 1. The owner signs up and signs in ONCE, so the app creates their profile.
+# 2. Get their exact Neon Auth user id — Neon Console -> Auth -> Users, or:
+#      SELECT id, email FROM neon_auth."user" ORDER BY "createdAt" DESC LIMIT 10;
+# 3. Promote that exact id:
+node --env-file=.env scripts/promote-admin.js <auth_user_id>
+# 4. Sign out and back in.
+
+node --env-file=.env scripts/promote-admin.js --list      # who exists, and their roles
+node --env-file=.env scripts/promote-admin.js <id> --demote
+```
+
+It takes an exact `auth_user_id` — never an email, a name, or "the earliest
+profile" — refuses to run if no matching profile exists, never creates one, and
+reports exactly which profile changed. Full procedure in `ENVIRONMENT.md`.
+
 ## Structure
 
 - `src/styles/` — design tokens and the CSS system. `tokens.css` is the single source of truth for colour, type, spacing, radius and motion.

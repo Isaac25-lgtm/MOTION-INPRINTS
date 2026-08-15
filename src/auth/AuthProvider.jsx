@@ -1,21 +1,28 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { authClient, isConfigured } from './authClient'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { authClient, isConfigured, isGoogleEnabled } from './authClient'
 import { accountService } from '../services/accountService'
 import { setAuthTokenProvider } from '../services/apiClient'
 
 /* Session state.
  *
- * The access token lives in memory here and is handed to the API client, so
- * every request carries it without any component needing to know it exists. The
- * refresh token is the only thing persisted.
+ * The durable credential is an HTTP-only cookie owned by Neon Auth, which this
+ * code cannot read and does not try to. Nothing is persisted here. What the API
+ * client needs is a short-lived JWT, fetched on demand by `authClient.token()`
+ * and cached in memory for a minute so a burst of requests does not mint one
+ * each. An earlier version kept a long-lived refresh token in localStorage; that
+ * is gone.
  *
- * The role shown in this context is read from the server profile, never from the
- * token or from anything the browser can set. It decides what to *render*;
- * `requireAdmin` on the server decides what is *allowed*. Those are different
- * jobs, and only the second one is security.
+ * The role in this context comes from the server profile, never from the token
+ * and never from anything the browser can set. It decides what to *render*;
+ * `requireAdmin` on the server decides what is *allowed*. Only the second is
+ * security.
  */
 
 const AuthContext = createContext({ status: 'anonymous', user: null })
+
+/* Tokens are short-lived by design. Caching for 60s keeps a page of parallel
+   requests down to one mint, while staying far inside the token's lifetime. */
+const TOKEN_TTL_MS = 60_000
 
 export function AuthProvider({ children }) {
   const [state, setState] = useState({
@@ -26,52 +33,71 @@ export function AuthProvider({ children }) {
     user: null,
     profile: null,
   })
-  const tokenRef = useRef(null)
 
-  // The API client pulls the token at call time, so a refresh mid-session is
-  // picked up without re-wiring anything.
-  useEffect(() => { setAuthTokenProvider(() => tokenRef.current) }, [])
+  /* Registered once. The API client pulls a token at call time, so a sign-in or
+     sign-out later in the session is picked up with no re-wiring. */
+  useEffect(() => {
+    let cached = { token: null, at: 0 }
+    setAuthTokenProvider(async () => {
+      const now = Date.now()
+      if (cached.token && now - cached.at < TOKEN_TTL_MS) return cached.token
+      const token = await authClient.token()
+      cached = { token, at: now }
+      return token
+    })
+    return () => setAuthTokenProvider(null)
+  }, [])
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (user) => {
     try {
       const profile = await accountService.profile()
-      setState({ status: 'authenticated', user: { id: profile.auth_user_id }, profile })
+      setState({ status: 'authenticated', user: user || { id: profile.auth_user_id }, profile })
     } catch (error) {
-      // Authenticated but with no Motion profile yet — a first sign-in.
-      if (error.status === 403) setState(current => ({ ...current, status: 'authenticated', profile: null }))
-      else throw error
+      /* Authenticated but with no Motion profile yet — a first sign-in. The
+         route guard sends them to /account/profile to complete it. */
+      if (error.status === 403 || error.status === 404) {
+        setState({ status: 'authenticated', user: user || null, profile: null })
+      } else throw error
     }
   }, [])
 
-  useEffect(() => {
-    if (!isConfigured()) return
-    let active = true
-    authClient.restore()
-      .then(async (session) => {
-        if (!active) return
-        if (!session) { setState({ status: 'anonymous', user: null, profile: null }); return }
-        tokenRef.current = session.accessToken
-        await loadProfile()
-      })
-      .catch(() => { if (active) setState({ status: 'anonymous', user: null, profile: null }) })
-    return () => { active = false }
+  /* Restores an existing session on load. This is also what completes a Google
+     sign-in: the provider redirects back to our origin with the session cookie
+     already set, so there is no code to exchange here — the session simply
+     exists, and this picks it up. */
+  const restore = useCallback(async () => {
+    const session = await authClient.getSession()
+    if (!session) { setState({ status: 'anonymous', user: null, profile: null }); return null }
+    await loadProfile(session.user)
+    return session
   }, [loadProfile])
+
+  useEffect(() => {
+    if (!isConfigured()) return undefined
+    let active = true
+    restore().catch(() => { if (active) setState({ status: 'anonymous', user: null, profile: null }) })
+    return () => { active = false }
+  }, [restore])
 
   const signIn = useCallback(async (credentials) => {
-    const session = await authClient.signIn(credentials)
-    tokenRef.current = session.accessToken
-    await loadProfile()
-  }, [loadProfile])
+    await authClient.signIn(credentials)
+    await restore()
+  }, [restore])
 
+  /* Returns the verification state rather than assuming a session exists. With
+     email verification enabled — as it is on this project — sign-up creates the
+     account but no session, and the page must say so instead of redirecting to
+     an account area the user cannot reach yet. */
   const signUp = useCallback(async (credentials) => {
-    const session = await authClient.signUp(credentials)
-    tokenRef.current = session.accessToken
-    await loadProfile()
-  }, [loadProfile])
+    const result = await authClient.signUp(credentials)
+    if (!result.verificationRequired) await restore()
+    return result
+  }, [restore])
+
+  const signInWithGoogle = useCallback((options) => authClient.signInWithGoogle(options), [])
 
   const signOut = useCallback(async () => {
-    await authClient.signOut(tokenRef.current)
-    tokenRef.current = null
+    await authClient.signOut()
     setState({ status: 'anonymous', user: null, profile: null })
   }, [])
 
@@ -81,9 +107,10 @@ export function AuthProvider({ children }) {
     isAuthenticated: state.status === 'authenticated',
     isAdmin: state.profile?.role === 'admin',
     configured: isConfigured(),
-    signIn, signUp, signOut,
-    refreshProfile: loadProfile,
-  }), [state, signIn, signUp, signOut, loadProfile])
+    googleEnabled: isGoogleEnabled(),
+    signIn, signUp, signInWithGoogle, signOut,
+    refreshProfile: () => loadProfile(state.user),
+  }), [state, signIn, signUp, signInWithGoogle, signOut, loadProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

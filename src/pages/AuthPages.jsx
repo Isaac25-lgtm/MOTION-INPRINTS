@@ -7,14 +7,21 @@ import { useToast } from '../components/ToastProvider'
 import { useAuth } from '../auth/AuthProvider'
 import { authClient } from '../auth/authClient'
 
-/* Email and password sign-in.
+/* Sign-in, sign-up and password reset against Neon Auth (Managed Better Auth).
  *
- * Google and other social providers are deliberately absent — Motion asked for
- * password sign-in, and nothing here depends on a social identity.
+ * Two equal ways in: Google, or an email address and a password. Email is a
+ * first-class method, not a fallback — any working address is fine (Outlook,
+ * Yahoo, Proton, a company or school address, or a Gmail address for someone who
+ * would rather hold a separate Motion password than use Google). Nothing here
+ * says "Gmail" or requires a Google account.
  *
- * When no authentication project is configured these pages say so plainly rather
- * than rendering a form that cannot succeed. A login box that silently fails is
- * worse than an honest message. */
+ * There is no username-only account type. Password recovery, email verification,
+ * proof notifications and order updates all need a reachable address.
+ *
+ * When no auth project is configured these pages say so plainly rather than
+ * rendering a form that cannot succeed. Google is only offered when it is
+ * actually enabled, so the interface never advertises a provider that will fail.
+ */
 
 function AuthShell({ title, intro, children, footer }) {
   const { configured } = useAuth()
@@ -46,27 +53,64 @@ function AuthShell({ title, intro, children, footer }) {
   )
 }
 
+/* Google, then a labelled divider. Rendered only when Google is enabled, so the
+   divider never introduces an absent option. */
+function GoogleChoice({ label, next, onError }) {
+  const { googleEnabled, signInWithGoogle } = useAuth()
+  const [busy, setBusy] = useState(false)
+  if (!googleEnabled) return null
+
+  const start = async () => {
+    setBusy(true)
+    try {
+      // Redirects away from the page; nothing after this runs on success.
+      await signInWithGoogle({ next })
+    } catch (caught) { onError(caught.message); setBusy(false) }
+  }
+
+  return (
+    <div className="stack">
+      <Button type="button" variant="secondary" onClick={start} disabled={busy}>
+        {busy ? 'Opening Google…' : 'Continue with Google'}
+      </Button>
+      <p className="auth-divider" aria-hidden="true"><span>{label}</span></p>
+    </div>
+  )
+}
+
 export function SignInPage() {
   const { signIn, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const notify = useToast()
+  const [params] = useSearchParams()
   const [form, setForm] = useState({ email: '', password: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [unverified, setUnverified] = useState(null)
 
   if (isAuthenticated) return <Navigate to="/account" replace />
 
+  const justVerified = params.get('verified') === '1'
+  const oauthFailed = params.get('error') === 'oauth'
+
   const submit = async (event) => {
     event.preventDefault()
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setUnverified(null)
     try {
       await signIn(form)
       notify('Signed in.', 'success')
       navigate('/account')
     } catch (caught) {
-      // Deliberately does not distinguish unknown email from wrong password.
-      setError(caught.message)
+      /* Verification is a different problem from a wrong password, and the fix
+         is different too, so it gets its own state with a resend action. */
+      if (caught.code === 'email_not_verified') setUnverified(form.email)
+      else setError(caught.message)
     } finally { setBusy(false) }
+  }
+
+  const resend = async () => {
+    await authClient.resendVerification({ email: unverified })
+    notify('If that address needs confirming, a new link is on its way.', 'success')
   }
 
   return (
@@ -80,10 +124,34 @@ export function SignInPage() {
         </p>
       )}
     >
+      {justVerified && (
+        <p className="t-body-sm" role="status" style={{ color: 'var(--state-success)' }}>
+          Your email address is confirmed. Sign in below.
+        </p>
+      )}
+      {oauthFailed && (
+        <p className="field__error" role="alert">Google sign-in did not complete. Try again, or use your email and password.</p>
+      )}
+
+      <GoogleChoice label="or sign in with email" next="/account" onError={setError} />
+
       <form className="stack" onSubmit={submit} noValidate>
         <Field label="Email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required autoComplete="email" />
         <Field label="Password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required autoComplete="current-password" />
+
+        {/* Deliberately does not distinguish an unknown address from a wrong password. */}
         {error && <p className="field__error" role="alert">{error}</p>}
+
+        {unverified && (
+          <div className="state" role="alert">
+            <p className="t-body-sm">
+              Please confirm your email address first. We sent a link to <strong>{unverified}</strong> when
+              the account was created.
+            </p>
+            <Button type="button" variant="text" size="sm" onClick={resend}>Send the link again</Button>
+          </div>
+        )}
+
         <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
         <Link to="/reset-password" className="t-body-sm link">Forgotten your password?</Link>
       </form>
@@ -95,9 +163,10 @@ export function SignUpPage() {
   const { signUp, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const notify = useToast()
-  const [form, setForm] = useState({ email: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [checkInbox, setCheckInbox] = useState(null)
 
   if (isAuthenticated) return <Navigate to="/account" replace />
 
@@ -107,10 +176,42 @@ export function SignUpPage() {
     if (form.password.length < 8) { setError('Use at least 8 characters.'); return }
     setBusy(true); setError(null)
     try {
-      await signUp({ email: form.email, password: form.password })
-      notify('Account created.', 'success')
-      navigate('/account/profile')
+      const { verificationRequired } = await signUp({ email: form.email, password: form.password, name: form.name })
+      /* With verification enabled the account exists but no session does. Saying
+         "account created" and redirecting to the account area would send them
+         somewhere they cannot yet reach. */
+      if (verificationRequired) setCheckInbox(form.email)
+      else { notify('Account created.', 'success'); navigate('/account/profile') }
     } catch (caught) { setError(caught.message) } finally { setBusy(false) }
+  }
+
+  if (checkInbox) {
+    return (
+      <AuthShell title="Confirm your email" intro="One more step before you can sign in.">
+        <div className="state" role="status">
+          <p className="t-body">
+            We sent a confirmation link to <strong>{checkInbox}</strong>. Open it, then sign in.
+          </p>
+          <p className="t-body-sm t-muted">
+            If it has not arrived in a few minutes, check your spam folder.
+          </p>
+          <div className="cluster">
+            <Button to="/sign-in" variant="secondary" size="sm">Go to sign in</Button>
+            <Button
+              type="button"
+              variant="text"
+              size="sm"
+              onClick={async () => {
+                await authClient.resendVerification({ email: checkInbox })
+                notify('If that address needs confirming, a new link is on its way.', 'success')
+              }}
+            >
+              Send it again
+            </Button>
+          </div>
+        </div>
+      </AuthShell>
+    )
   }
 
   return (
@@ -119,8 +220,21 @@ export function SignUpPage() {
       intro="Keep your order history, approve proofs and reorder past jobs."
       footer={<p className="t-body-sm t-muted">Already registered? <Link to="/sign-in" className="link">Sign in</Link>.</p>}
     >
+      <GoogleChoice label="or create an account with email" next="/account/profile" onError={setError} />
+
       <form className="stack" onSubmit={submit} noValidate>
-        <Field label="Email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required autoComplete="email" />
+        {/* Name is collected here only because Neon Auth accepts one at sign-up.
+            Company and phone are profile fields, gathered after authentication. */}
+        <Field label="Your name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required autoComplete="name" />
+        <Field
+          label="Email address"
+          type="email"
+          hint="Any address you can receive mail at — work, school, Outlook, Yahoo, Proton or Gmail."
+          value={form.email}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
+          required
+          autoComplete="email"
+        />
         <Field label="Password" type="password" hint="At least 8 characters." value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required autoComplete="new-password" />
         <Field label="Confirm password" type="password" value={form.confirm} onChange={(event) => setForm({ ...form, confirm: event.target.value })} required autoComplete="new-password" />
         {error && <p className="field__error" role="alert">{error}</p>}
@@ -132,10 +246,16 @@ export function SignUpPage() {
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams()
-  const code = params.get('code')
+  /* Better Auth returns the reset credential as `token`. The previous
+     integration read `code`, which is Stack's name for it — with that mismatch
+     the page would show the request form again instead of the new-password
+     form, and the link would appear broken. */
+  const token = params.get('token')
+  const invalidLink = params.get('error') === 'INVALID_TOKEN'
   const notify = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
@@ -144,20 +264,19 @@ export function ResetPasswordPage() {
   const requestReset = async (event) => {
     event.preventDefault()
     setBusy(true); setError(null)
-    try {
-      await authClient.requestPasswordReset({ email })
-      // Reported identically whether or not the account exists, so this cannot be
-      // used to discover which addresses are registered.
-      setSent(true)
-    } catch (caught) { setError(caught.message) } finally { setBusy(false) }
+    // Never reports failure: doing so would reveal which addresses are registered.
+    await authClient.requestPasswordReset({ email })
+    setSent(true)
+    setBusy(false)
   }
 
   const applyReset = async (event) => {
     event.preventDefault()
+    if (password !== confirm) { setError('The two passwords do not match.'); return }
     if (password.length < 8) { setError('Use at least 8 characters.'); return }
     setBusy(true); setError(null)
     try {
-      await authClient.resetPassword({ code, password })
+      await authClient.resetPassword({ token, password })
       notify('Your password has been changed.', 'success')
       navigate('/sign-in')
     } catch (caught) { setError(caught.message) } finally { setBusy(false) }
@@ -165,13 +284,19 @@ export function ResetPasswordPage() {
 
   return (
     <AuthShell
-      title={code ? 'Choose a new password' : 'Reset your password'}
-      intro={code ? 'Enter the new password for your account.' : 'We will email you a link to set a new password.'}
+      title={token ? 'Choose a new password' : 'Reset your password'}
+      intro={token ? 'Enter the new password for your account.' : 'We will email you a link to set a new password.'}
       footer={<p className="t-body-sm t-muted"><Link to="/sign-in" className="link">Back to sign in</Link></p>}
     >
-      {code ? (
+      {invalidLink && (
+        <p className="field__error" role="alert">
+          That reset link has expired or has already been used. Request a new one below.
+        </p>
+      )}
+      {token ? (
         <form className="stack" onSubmit={applyReset} noValidate>
           <Field label="New password" type="password" hint="At least 8 characters." value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="new-password" />
+          <Field label="Confirm new password" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required autoComplete="new-password" />
           {error && <p className="field__error" role="alert">{error}</p>}
           <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving…' : 'Change password'}</Button>
         </form>

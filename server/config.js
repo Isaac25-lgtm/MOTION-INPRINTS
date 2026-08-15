@@ -1,7 +1,36 @@
 const required = ['DATABASE_URL', 'NEON_AUTH_JWKS_URL', 'NEON_AUTH_ISSUER']
+
+/* Validates the two Neon Auth values together.
+ *
+ * The issuer is the ORIGIN of the Neon Auth URL, while the JWKS lives under its
+ * full path — for `https://ep-x.neonauth.../neondb/auth` the issuer is
+ * `https://ep-x.neonauth...` and the JWKS is
+ * `https://ep-x.neonauth.../neondb/auth/.well-known/jwks.json`.
+ *
+ * The easy mistake is pasting the same value into both, or giving the issuer a
+ * trailing path. Either produces tokens that verify cryptographically and are
+ * then rejected on the issuer claim, which reads like a broken login rather than
+ * a configuration error. Caught here instead, at startup. */
+function validateAuth(jwksUrl, issuer) {
+  let jwks, iss
+  try { jwks = new URL(jwksUrl) } catch { throw new Error('NEON_AUTH_JWKS_URL must be an absolute URL ending in /.well-known/jwks.json') }
+  try { iss = new URL(issuer) } catch { throw new Error('NEON_AUTH_ISSUER must be an absolute URL, and is the ORIGIN of your Neon Auth URL with no path.') }
+
+  if (!jwks.pathname.endsWith('/.well-known/jwks.json')) {
+    throw new Error('NEON_AUTH_JWKS_URL must end in /.well-known/jwks.json')
+  }
+  if (iss.pathname !== '/' && iss.pathname !== '') {
+    throw new Error(`NEON_AUTH_ISSUER must be an origin with no path. Expected "${iss.origin}", got "${issuer}".`)
+  }
+  if (jwks.origin !== iss.origin) {
+    throw new Error(`NEON_AUTH_ISSUER (${iss.origin}) and NEON_AUTH_JWKS_URL (${jwks.origin}) must share an origin.`)
+  }
+}
+
 export function serverConfig(source = process.env) {
   const missing = required.filter(name => !source[name])
   if (missing.length) throw new Error(`Missing required server environment variables: ${missing.join(', ')}`)
+  validateAuth(source.NEON_AUTH_JWKS_URL, source.NEON_AUTH_ISSUER)
   const trustedClientHeader = (source.API_TRUSTED_CLIENT_HEADER || '').trim().toLowerCase()
   // Without a runtime-controlled client header, anonymous callers cannot be told apart and go unlimited.
   // That is workable while developing but must never reach production, so refuse to start instead.

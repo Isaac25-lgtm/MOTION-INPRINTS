@@ -556,3 +556,29 @@ a:hover .frame--zoom > img,
 @media (max-width: 34rem) {
   .upload-list__item { grid-template-columns: 1fr; }
 }
+
+/* ── Auth divider ─────────────────────────────────────────────────────────── */
+
+/* Separates "Continue with Google" from the email form. A centred label with a
+   hairline running through it, drawn from the same tokens as every other rule —
+   no auth UI framework, no borrowed component.
+
+   The element is aria-hidden: the two methods are already distinguishable by
+   their own labels, and a screen reader announcing "or sign in with email"
+   between a button and a labelled form adds noise rather than meaning. */
+.auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block: var(--space-2);
+  font-size: var(--size-caption);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  height: var(--border-width);
+  background: var(--border);
+}

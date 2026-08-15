@@ -138,7 +138,15 @@ describe('backend access and input rules', () => {
   })
 
   it('refuses to start in production without a trusted client header', () => {
-    const base = { DATABASE_URL: 'x', NEON_AUTH_JWKS_URL: 'x', NEON_AUTH_ISSUER: 'x' }
+    /* The auth values must now be real URLs: serverConfig validates that the
+       issuer is an origin and the JWKS is its well-known path, because pasting
+       one into both is the failure that presents as a broken login rather than
+       as a misconfiguration. Placeholders no longer get through. */
+    const base = {
+      DATABASE_URL: 'x',
+      NEON_AUTH_JWKS_URL: 'https://ep-test.neonauth.example.aws.neon.tech/neondb/auth/.well-known/jwks.json',
+      NEON_AUTH_ISSUER: 'https://ep-test.neonauth.example.aws.neon.tech',
+    }
     expect(() => serverConfig({ ...base, NODE_ENV: 'production' })).toThrow(/API_TRUSTED_CLIENT_HEADER/)
     expect(serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'X-Real-IP' }).trustedClientHeader).toBe('x-real-ip')
   })
