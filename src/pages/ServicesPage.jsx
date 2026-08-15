@@ -64,8 +64,8 @@ export function ServicesPage() {
         }}
       </Async>
 
-      <section className="section rule">
-        <div className="split" style={{ paddingBlockStart: 'var(--space-7)' }}>
+      <section className="section section--alt bleed">
+        <div className="container split">
           <div className="stack">
             <p className="t-eyebrow">Not listed?</p>
             <h2 className="t-h2">Most of what we do is made to order</h2>

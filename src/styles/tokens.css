@@ -16,11 +16,17 @@
 :root {
   --motion-blue-source: #1f80b9;
 
-  /* Brand ramp. Kept deliberately short: blue is an accent here, not a surface.
-     The physical work Motion produces supplies the colour; the interface frames it. */
+  /* Brand ramp. Blue is a SURFACE colour here, not only an accent — Motion is a
+     colour business, and a site for it that is white, grey and black reads as
+     unfinished rather than restrained. Full ramp so blue can carry whole bands,
+     deep sections and inverse type without losing contrast anywhere. */
+  --blue-900: #0a2c40;
+  --blue-800: #103f5c;
   --blue-700: #175f8a;
   --blue-600: var(--motion-blue-source);
   --blue-500: #3f9bd0;
+  --blue-400: #6fb8de;
+  --blue-300: #9fd0e9;
   --blue-100: #d7eaf6;
   --blue-050: #eff7fc;
 
@@ -52,6 +58,28 @@
   --bg: var(--paper);
   --bg-alt: var(--paper-warm);
   --bg-inverse: var(--ink-900);
+  /* Blue surfaces, for the bands that carry the brand through the page.
+
+     `--bg-brand` is one step darker than the logo blue on purpose: white body
+     text on --blue-600 measures only 4.33:1, which fails AA for anything below
+     large text, and no lighter foreground can fix that because white is already
+     the lightest available. Darkening the surface to #1b73a6 lifts white to
+     5.19:1 while staying unmistakably the brand colour. The logo blue itself is
+     unchanged and still used for marks, rules, focus rings and accents. */
+  --bg-brand: #1b73a6;
+  --bg-brand-deep: var(--blue-800);
+  --bg-brand-soft: var(--blue-050);
+
+  /* Secondary text and hairlines as they appear ON each coloured surface. Held
+     here rather than in the band rules so every colour in the system still has
+     exactly one definition. */
+  --on-inverse-muted: #a8adb6;
+  --on-inverse-border: #3d434c;
+  /* Body text on a brand band. Kept close to white because the band is already
+     at the limit of what carries legible body copy — a softer tint measured
+     3.43:1 and failed. */
+  --on-brand-muted: #eaf4fa;
+  --on-brand-deep-muted: #a8cbe0;
   --text: var(--ink-900);
   --text-muted: var(--ink-500);
   --text-inverse: var(--paper);
@@ -78,9 +106,13 @@
 
   /* Scale is modest on purpose: hierarchy comes from weight, width, colour and
      placement, not from ever-larger type. Display clamps rather than jumping. */
-  --size-display: clamp(2.75rem, 1.6rem + 5.2vw, 6rem);
-  --size-h1: clamp(2.125rem, 1.45rem + 2.9vw, 3.75rem);
-  --size-h2: clamp(1.625rem, 1.28rem + 1.5vw, 2.5rem);
+  /* Display was clamping to 96px, which made a three-word statement consume an
+     entire viewport before any content appeared — the oversized-hero pattern the
+     brief explicitly rules out. Capped well below that: presence now comes from
+     weight, width and colour rather than sheer size. */
+  --size-display: clamp(2.25rem, 1.5rem + 2.6vw, 3.5rem);
+  --size-h1: clamp(1.875rem, 1.4rem + 1.9vw, 2.75rem);
+  --size-h2: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
   --size-h3: clamp(1.25rem, 1.13rem + 0.55vw, 1.625rem);
   --size-h4: 1.0625rem;
   --size-body-lg: 1.125rem;

@@ -14,7 +14,10 @@ import { buildReport, operationalSnapshot } from './reports.js'
 import { toAmount } from './money.js'
 
 const routes = (pathname) => pathname.replace(/^\/api/, '').split('/').filter(Boolean)
-const publicProductFields = 'id, name, slug, short_description, description, category_id, pricing_type, starting_price, currency, production_lead_time'
+/* Every query using this list joins `categories`, which also has id, name, slug
+   and description — so the columns must be table-qualified or Postgres rejects
+   the statement as ambiguous. The products table is aliased `p` throughout. */
+const publicProductFields = 'p.id, p.name, p.slug, p.short_description, p.description, p.category_id, p.pricing_type, p.starting_price, p.currency, p.production_lead_time'
 const productColumns = { name: 'name', slug: 'slug', categoryId: 'category_id', shortDescription: 'short_description', description: 'description', pricingType: 'pricing_type', startingPrice: 'starting_price', isConfigurable: 'is_configurable', quoteRequired: 'quote_required', status: 'status' }
 const categoryColumns = { name: 'name', slug: 'slug', parentId: 'parent_id', description: 'description', sortOrder: 'sort_order', isPublished: 'is_published' }
 const projectColumns = { title: 'title', slug: 'slug', categoryId: 'category_id', clientName: 'client_name', location: 'location', description: 'description', completedOn: 'completed_on', isFeatured: 'is_featured', isPublished: 'is_published' }

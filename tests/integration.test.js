@@ -127,6 +127,59 @@ describeIfDb('schema behaviour (real database)', () => {
     return rows[0]
   }
 
+  /* Every public endpoint, executed against real PostgreSQL.
+   *
+   * The doubles used elsewhere return canned rows without parsing the SQL, so a
+   * malformed statement passes them happily. `/products` and `/search` were both
+   * returning 500 in the running application — `column reference "id" is
+   * ambiguous`, because the shared column list was unqualified while every query
+   * using it joins `categories`, which has its own id, name, slug and
+   * description. Nothing but real execution catches that. */
+  it('executes every public endpoint against real SQL', async () => {
+    const api = createApi({ db: realDatabase(), logger: { info() {}, error() {} } })
+    const endpoints = [
+      '/api/products', '/api/products?category=signage', '/api/products?sort=price-asc',
+      '/api/products?sort=featured&q=banner', '/api/categories', '/api/services',
+      '/api/projects', '/api/projects?featured=true', '/api/content/public',
+      '/api/search?q=sign', '/api/search?q=100%25',
+    ]
+    for (const path of endpoints) {
+      const response = await api(new Request(`https://api.motion.test${path}`))
+      const body = await response.json()
+      expect(response.status, `${path} returned ${response.status}: ${JSON.stringify(body.error || {})}`).toBe(200)
+    }
+  })
+
+  it('executes pricing and cart validation against real SQL', async () => {
+    await inRollback(async () => {
+      const { rows: [product] } = await client.query(
+        `INSERT INTO public.products(name, slug, pricing_type, starting_price, quote_required, status, min_quantity)
+         VALUES('Test banner','test-banner-sql','fixed',120000,false,'published',1) RETURNING id, slug`)
+      const api = createApi({ db: realDatabase(), logger: { info() {}, error() {} } })
+
+      const priced = await api(new Request('https://api.motion.test/api/pricing/calculate', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: product.slug, quantity: 3, selection: {} }),
+      }))
+      const pricedBody = await priced.json()
+      expect(priced.status, JSON.stringify(pricedBody.error || {})).toBe(200)
+      expect(pricedBody.data.total).toBe('360000')
+
+      const cart = await api(new Request('https://api.motion.test/api/cart/validate', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ items: [{ key: 'a', productId: product.id, quantity: 2, selection: {}, total: '1' }] }),
+      }))
+      const cartBody = await cart.json()
+      expect(cart.status, JSON.stringify(cartBody.error || {})).toBe(200)
+      // The claimed total of 1 is discarded and the real price returned.
+      expect(cartBody.data.items[0].total).toBe('240000')
+      expect(cartBody.data.items[0].priceChanged).toBe(true)
+
+      const detail = await api(new Request(`https://api.motion.test/api/products/${product.slug}`))
+      expect(detail.status).toBe(200)
+    })
+  })
+
   it('refuses production entry without an approved proof', async () => {
     await inRollback(async () => {
       const order = await newOrder(', requires_proof_approval', [true], 'design_in_progress')

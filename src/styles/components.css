@@ -98,20 +98,34 @@ a:hover .frame--zoom > img,
 
 /* Placeholder shown wherever genuine Motion photography has not been supplied.
    Deliberately plain and labelled: it must never be mistaken for real work. */
+/* The hatched version shouted louder than the content around it. This still
+   cannot be mistaken for a photograph — flat brand tint, dashed edge, explicit
+   label — but it recedes instead of dominating the page. */
 .frame--placeholder {
   display: grid;
   place-items: center;
-  background: repeating-linear-gradient(135deg, var(--ink-100) 0 10px, var(--ink-050, #f4f5f7) 10px 20px);
-  border: var(--border-width) dashed var(--border-strong);
+  background: var(--blue-050);
+  border: var(--border-width) dashed var(--blue-300);
 }
 .frame--placeholder span {
-  font-size: var(--size-caption);
+  font-size: var(--size-eyebrow);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
-  color: var(--ink-400);
+  font-weight: var(--weight-semibold);
+  /* blue-500 on this tint measured 2.85:1 and failed AA outright. The darker
+     step reads at 6.37:1 and still recedes against the surrounding content. */
+  color: var(--blue-700);
   padding: var(--space-2) var(--space-3);
   text-align: center;
 }
+/* On a coloured band the tint would vanish, so it inverts. */
+.section--brand .frame--placeholder,
+.section--brand-deep .frame--placeholder {
+  background: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.3);
+}
+.section--brand .frame--placeholder span,
+.section--brand-deep .frame--placeholder span { color: rgb(255 255 255 / 0.7); }
 
 /* Three-image composition: the middle image drops so the row reads as a
    composed spread rather than three equal thirds. Collapses on small screens. */
@@ -141,10 +155,48 @@ a:hover .frame--zoom > img,
 /* ── Category tile — a photograph with a name set on the page beneath it,
    not a coloured box with an icon. */
 
-.category { display: grid; gap: var(--space-3); }
-.category__name { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-weight: var(--weight-medium); }
-.category__name .arrow { transition: transform var(--duration) var(--ease); color: var(--text-muted); }
+/* Category tile.
+
+   Previously an image plus a name — so with no photography it was a grey box
+   with a word under it, three across. Now the tile is a designed object in its
+   own right: a coloured field that carries the name, which a photograph later
+   sits inside rather than replaces. */
+.category {
+  display: grid;
+  gap: var(--space-3);
+  position: relative;
+  padding: var(--space-5);
+  min-height: 11rem;
+  align-content: end;
+  background: var(--blue-050);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: background-color var(--duration) var(--ease);
+}
+.category:hover { background: var(--blue-100); }
+
+/* With a real photograph the tint gives way and the caption sits on the page
+   beneath it, never typeset across the image. */
+.category:has(.frame--zoom) { padding: 0; background: none; min-height: 0; align-content: start; }
+.category:has(.frame--zoom):hover { background: none; }
+
+.category__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--size-h4);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-heading);
+  color: var(--blue-900);
+}
+.category:has(.frame--zoom) .category__name { color: var(--text); padding-inline: 0; }
+.category__name .arrow { transition: transform var(--duration) var(--ease); color: var(--blue-600); }
 .category:hover .category__name .arrow { transform: translateX(4px); }
+
+/* The placeholder frame is redundant inside a tinted tile — the tile is the
+   visual. It returns automatically once a real image exists. */
+.category .frame--placeholder { display: none; }
 
 /* ── Badge — flat, bordered, no pill unless it is a genuine status chip. */
 
@@ -358,8 +410,10 @@ a:hover .frame--zoom > img,
   border-block-end: 2px solid transparent;
   transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease);
 }
-.filters button:hover { color: var(--text); }
-.filters button[aria-pressed='true'] { color: var(--text); border-block-end-color: var(--text); font-weight: var(--weight-medium); }
+.filters button:hover { color: var(--text-accent); }
+/* The active filter is marked in brand colour, so the current view is obvious at
+   a glance without resorting to a coloured pill. */
+.filters button[aria-pressed='true'] { color: var(--blue-700); border-block-end-color: var(--blue-600); font-weight: var(--weight-semibold); }
 
 /* ── Overlays ────────────────────────────────────────────────────────────── */
 
@@ -422,15 +476,29 @@ a:hover .frame--zoom > img,
 .toast.error { background: var(--state-error); }
 .toast.success { background: var(--state-success); }
 
-/* Empty and error states are bordered blocks, not illustrated cards. */
+/* Empty and error states are bordered blocks, not illustrated cards.
+
+   Tinted rather than dashed grey: on a site that is legitimately empty until
+   real content arrives, these appear often, and a page of grey dashed boxes was
+   what made the first build read as broken rather than as new. */
 .state {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
   padding: var(--space-6);
-  border: var(--border-width) dashed var(--border-strong);
+  background: var(--blue-050);
+  border: var(--border-width) solid var(--blue-100);
+  border-inline-start: 3px solid var(--blue-500);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
+}
+/* On coloured bands the tint would disappear, so it inverts. */
+.section--brand .state,
+.section--brand-deep .state,
+.section--inverse .state {
+  background: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.2);
+  border-inline-start-color: var(--blue-400);
 }
 .state--center { justify-items: center; text-align: center; }
 

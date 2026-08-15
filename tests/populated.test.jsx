@@ -69,6 +69,7 @@ vi.mock('../src/services/apiClient.js', () => ({
 const { ProductCard, ProjectCard, CategoryTile } = await import('../src/components/ui/Cards.jsx')
 const { Price, formatAmount } = await import('../src/components/ui/Price.jsx')
 const { Pagination } = await import('../src/components/ui/Navigation.jsx')
+const { resolveCategoryImage } = await import('../src/features/home/placeholderImagery.js')
 
 /* Intl separates currency symbol from amount with a non-breaking space; assertions
    read visible text, so it is normalised here. */
@@ -131,9 +132,50 @@ describe('populated composition', () => {
     expect(html).toContain('acrylic face')
   })
 
-  it('renders category tiles including ones without descriptions', () => {
-    const html = render(<div className="grid grid--categories">{categories.map(c => <CategoryTile key={c.id} category={c} />)}</div>)
-    expect((html.match(/class="category"/g) || []).length).toBe(4)
+  it('renders category cards as real links from real category data', () => {
+    const parents = categories.filter(row => !row.parent_id)
+    const html = render(
+      <div className="grid grid--categories">
+        {parents.map(parent => (
+          <CategoryTile key={parent.id} category={parent} services={categories.filter(row => row.parent_id === parent.id)} />
+        ))}
+      </div>,
+    )
+    expect((html.match(/class="category-card"/g) || []).length).toBe(parents.length)
+    // Every card is a semantic link to its own shop route.
+    for (const parent of parents) expect(html).toContain(`href="/shop/${parent.slug}"`)
+    // The descriptor is the category's real children, never invented copy.
+    expect(html).toContain('Digital Printing')
+    expect(html).not.toMatch(/lorem|sample text|placeholder copy/i)
+  })
+
+  it('draws a specimen for a category with no photograph, and an image when there is one', () => {
+    /* A slug that deliberately matches nothing on disk. This used to reach for a
+       real category, which meant the test broke the moment someone dropped a
+       file into `src/assets/categories/` for that section — punishing the exact
+       workflow that folder exists to support. The behaviour under test is the
+       fallback itself, so the fixture should not depend on which sections happen
+       to be illustrated today. */
+    const unillustrated = { id: 'fixture-no-photo', name: 'Uncatalogued', slug: 'section-with-no-photograph' }
+
+    const withoutImage = render(<CategoryTile category={unillustrated} services={[]} />)
+    expect(withoutImage).toContain('specimen')
+    // The specimen is decorative; the link carries the accessible name.
+    expect(withoutImage).toContain('aria-hidden="true"')
+    expect(withoutImage).not.toContain('<img')
+    // No reversion to the generic grey placeholder treatment.
+    expect(withoutImage).not.toContain('frame--placeholder')
+
+    const withImage = render(<CategoryTile category={{ ...unillustrated, image: 'https://cdn.example.test/signage.webp' }} services={[]} />)
+    expect(withImage).toContain('<img')
+    expect(withImage).not.toContain('specimen')
+
+    // An owner-supplied file resolves by slug, and is not labelled as a stock
+    // placeholder — it is Motion's own selection, not stock standing in.
+    const supplied = resolveCategoryImage({ name: 'Signage', slug: 'signage' })
+    expect(supplied, 'signage.jpg should resolve from src/assets/categories').toBeTruthy()
+    expect(supplied.isPlaceholder).toBe(false)
+    expect(resolveCategoryImage(unillustrated)).toBeNull()
   })
 
   it('shows pagination controls at volume and disables them at the ends', () => {

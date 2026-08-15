@@ -9,3 +9,10 @@ coverage/
 .DS_Store
 .vite/
 .npm-cache/
+
+# Stale build output left by an earlier sandboxed run. Its files are owned by
+# the CodexSandboxOffline account, so `vite build` could not empty dist/ and the
+# current user cannot delete or rename the directory. It was renamed aside once
+# so the build could proceed. Remove it from an elevated shell and delete this
+# line:  takeown /f dist-stale-codex /r /d y  &&  rmdir /s /q dist-stale-codex
+dist-stale-codex/

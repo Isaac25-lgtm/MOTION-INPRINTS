@@ -106,8 +106,8 @@ export function AboutPage() {
         )}
       </Async>
 
-      <section className="section rule">
-        <div className="split" style={{ paddingBlockStart: 'var(--space-7)' }}>
+      <section className="section section--alt bleed">
+        <div className="container split">
           <h2 className="t-h2">Work with Motion</h2>
           <div className="cluster">
             <Button to="/custom-project" variant="primary">Start a custom project</Button>

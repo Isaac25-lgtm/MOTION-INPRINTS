@@ -133,22 +133,70 @@
 
 /* ── Hero ────────────────────────────────────────────────────────────────── */
 
-.hero { position: relative; }
-.hero__media { position: relative; }
-.hero__media .frame { aspect-ratio: 4 / 5; }
-@media (min-width: 48rem) { .hero__media .frame { aspect-ratio: 16 / 10; } }
-@media (min-width: 62rem) { .hero__media .frame { aspect-ratio: 16 / 9; } }
+/* Hero — compact, centred, text-only.
 
-.hero__body { display: grid; gap: var(--space-5); padding-block: var(--space-6) var(--space-7); }
-@media (min-width: 62rem) {
-  .hero { display: grid; grid-template-columns: 1fr; }
-  .hero__body { padding-block: var(--space-8) var(--space-7); max-width: 34rem; }
+   Three earlier versions put visual media on this fold and each cost more than
+   it returned. Copy above a full-width 16:9 frame opened the page with a
+   viewport of text and then a giant empty box. A side-by-side split fixed the
+   emptiness but made the hero tall and, once it held a blue photograph, loaded
+   the top of the page with colour before any work appeared.
+
+   This version carries no media at all. The whole fold is one centred statement,
+   which is both cheaper and more confident than a stock image, and it lets the
+   category grid start inside the first desktop screen.
+
+   Padding is intentionally near the space scale rather than --section-gap: the
+   hero must not open with more air than the sections beneath it. */
+.hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  padding-block: var(--space-6) var(--space-7);
 }
-.hero__statement { display: grid; gap: 0; }
-.hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+@media (min-width: 62rem) {
+  .hero { padding-block: var(--space-7); gap: var(--space-5); }
+}
 
+/* Centred, and held to a comfortable measure so the sentence breaks into two or
+   three lines rather than running the full container width. */
+.hero__standfirst {
+  max-width: 46ch;
+  margin-inline: auto;
+}
+
+/* Brand rule under the statement — a small deliberate mark of colour, and one of
+   only four places blue appears on this fold. */
+.hero__rule {
+  width: 4rem;
+  height: 4px;
+  background: var(--blue-600);
+  border-radius: var(--radius-sm);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-block-start: var(--space-2);
+}
+
+/* A short blue rule used to mark an important section without giving it a whole
+   coloured band. This is what emphasis looks like in the rebalanced system. */
+.accent-rule {
+  width: 3rem;
+  height: 3px;
+  background: var(--blue-600);
+  border-radius: var(--radius-sm);
+}
 /* Word-per-line display setting: "Design. Print. Brand." reads as three
-   deliberate lines rather than one long centred sentence. */
+   deliberate lines rather than one long centred sentence.
+
+   A second `.hero__actions` block used to sit here and, being later in the
+   cascade at equal specificity, silently dropped the centring declared above.
+   A `.hero__statement` rule sat beside it matching nothing at all. Both gone. */
 .hero__lines { display: grid; }
 .hero__lines span { display: block; }
 
@@ -180,7 +228,42 @@
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 
-.footer { border-block-start: var(--border-width) solid var(--border); background: var(--bg-alt); }
+/* The footer closes every page, so it carries the brand rather than fading out
+   into another off-white band. Deep blue keeps the whole site on one palette and
+   gives the page a definite end. */
+.footer {
+  background: var(--bg-brand-deep);
+  color: var(--text-inverse);
+  --text: var(--text-inverse);
+  --text-muted: var(--on-brand-deep-muted);
+  --border: rgb(255 255 255 / 0.16);
+  --border-strong: rgb(255 255 255 / 0.3);
+  --focus-ring: var(--blue-300);
+}
+.footer .wordmark__tag { color: var(--on-brand-deep-muted); border-inline-start-color: var(--border); }
+
+/* The supplied logo is dark artwork on transparency with no knockout variant
+   yet. Inverting it to white would erase the white 'i' inside the badge, so it
+   sits on a white panel — but the panel should read as a refined brand mark, not
+   a sponsor block.
+
+   Trimmed twice. The first version was the full lockup at 3.5rem with generous
+   padding, which dominated the footer. The second, at 2–2.25rem with
+   space-2/space-3 padding, was still a conspicuous white slab against the deep
+   blue. The panel is now sized to the mark rather than the mark to the panel:
+   a smaller lockup and padding just sufficient to keep the artwork off the blue.
+
+   A proper knockout asset removes the need for the panel altogether — that is
+   still the right fix, and it is on the backlog. */
+.footer .wordmark {
+  background: var(--paper);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  align-self: start;
+  justify-self: start;
+}
+.footer .wordmark__logo--lockup { height: 1.5rem; }
+@media (min-width: 62rem) { .footer .wordmark__logo--lockup { height: 1.75rem; } }
 .footer__top { display: grid; gap: var(--space-7); padding-block: var(--space-8) var(--space-7); }
 @media (min-width: 48rem) { .footer__top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 62rem) { .footer__top { grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); gap: var(--space-6); } }
@@ -334,8 +417,22 @@
 
 /* ── Page furniture ──────────────────────────────────────────────────────── */
 
+/* Page head. The eyebrow carries brand colour and a short rule sits under the
+   title, so every page opens with the palette rather than black text on white. */
 .page-head { display: grid; gap: var(--space-4); padding-block: var(--space-6) var(--space-7); }
 .page-head__title { max-width: 22ch; }
+.page-head::after {
+  content: '';
+  width: 3rem;
+  height: 3px;
+  background: var(--blue-600);
+  border-radius: var(--radius-sm);
+  margin-block-start: var(--space-1);
+}
+/* On a coloured band the rule needs to read against it. */
+.section--brand .page-head::after,
+.section--brand-deep .page-head::after,
+.section--inverse .page-head::after { background: var(--paper); }
 
 .prose { display: grid; gap: var(--space-4); max-width: 62ch; }
 .prose p { line-height: var(--leading-relaxed); }
@@ -375,5 +472,12 @@
   transition: padding-inline-start var(--duration) var(--ease);
 }
 .service-list a:last-child { border-block-end: var(--border-width) solid var(--border); }
-.service-list a:hover { padding-inline-start: var(--space-3); }
+/* Hover fills the row with a brand tint and moves it, so a long index of
+   services reads as interactive rather than as a printed list. */
+.service-list a:hover {
+  padding-inline-start: var(--space-3);
+  background: var(--blue-050);
+  color: var(--blue-800);
+}
+.service-list a:hover .arrow { color: var(--blue-600); }
 .service-list__name { font-size: var(--size-h4); font-weight: var(--weight-medium); }

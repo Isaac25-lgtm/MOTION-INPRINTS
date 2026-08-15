@@ -1,0 +1,269 @@
+/* Print specimens.
+
+   Drawn entirely from solid colour, hairlines and type — no gradients, no
+   images, nothing that could read as a photograph. A controlled family: one
+   frame, four tonal treatments, a different production cue per category, so a
+   row of them looks like a sample book rather than a row of identical boxes. */
+
+.specimen {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--paper-warm);
+  color: var(--ink-300);
+  transition: background-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+/* Four tones, so no two adjacent tiles look alike. */
+.specimen--paper { background: var(--paper-warm); color: var(--ink-300); }
+.specimen--ink { background: var(--ink-900); color: rgb(255 255 255 / 0.18); }
+.specimen--brand { background: var(--bg-brand); color: rgb(255 255 255 / 0.26); }
+.specimen--deep { background: var(--bg-brand-deep); color: rgb(255 255 255 / 0.2); }
+
+/* The letterform is a small corner mark, not the subject.
+
+   It was previously set at 11rem and cropped off the edge — striking on one
+   tile, but a grid of them read as a type catalogue rather than a printing
+   company. The material cue now leads and the letter simply identifies the
+   specimen, the way a sample in a book carries a reference code. */
+.specimen__mark {
+  position: absolute;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-4);
+  font-size: var(--size-body);
+  font-weight: var(--weight-bold);
+  font-stretch: 110%;
+  line-height: 1;
+  letter-spacing: 0;
+  color: currentColor;
+  opacity: 0.9;
+  user-select: none;
+}
+
+/* Trim guides at each corner. */
+.specimen__crops { position: absolute; inset: var(--space-3); pointer-events: none; }
+.specimen__crops span {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 0 solid currentColor;
+  opacity: 0.85;
+}
+.specimen__crops span:nth-child(1) { inset-block-start: 0; inset-inline-start: 0; border-block-start-width: 1px; border-inline-start-width: 1px; }
+.specimen__crops span:nth-child(2) { inset-block-start: 0; inset-inline-end: 0; border-block-start-width: 1px; border-inline-end-width: 1px; }
+.specimen__crops span:nth-child(3) { inset-block-end: 0; inset-inline-start: 0; border-block-end-width: 1px; border-inline-start-width: 1px; }
+.specimen__crops span:nth-child(4) { inset-block-end: 0; inset-inline-end: 0; border-block-end-width: 1px; border-inline-end-width: 1px; }
+
+/* ── Production cues ─────────────────────────────────────────────────────── */
+
+.specimen__cue { position: absolute; inset: 0; pointer-events: none; }
+/* Cues carry the tile now that the letterform has receded, so the tones need a
+   little more presence to read as material rather than as faint line art. */
+.specimen--paper { color: var(--blue-300); }
+.specimen--ink { color: rgb(255 255 255 / 0.3); }
+.specimen--brand { color: rgb(255 255 255 / 0.42); }
+.specimen--deep { color: rgb(255 255 255 / 0.34); }
+.specimen__cue i { position: absolute; display: block; background: currentColor; }
+
+/* Stacked sheet edges. */
+.specimen__cue--sheets i { inset-inline: 22% 12%; height: 3px; opacity: 0.9; }
+.specimen__cue--sheets i:nth-child(1) { inset-block-start: 26%; }
+.specimen__cue--sheets i:nth-child(2) { inset-block-start: 33%; inset-inline-start: 26%; }
+.specimen__cue--sheets i:nth-child(3) { inset-block-start: 40%; inset-inline-start: 30%; }
+.specimen__cue--sheets i:nth-child(4) { inset-block-start: 47%; inset-inline-start: 34%; }
+
+/* A sign face with standoff fixings. */
+.specimen__cue--panel i:nth-child(1) {
+  inset: 22% 14% 30% 46%;
+  background: none;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+.specimen__cue--panel i:nth-child(2) {
+  inset-block-start: 28%; inset-inline-end: 20%;
+  width: 7px; height: 7px; border-radius: var(--radius-full);
+}
+
+/* Pull-up banner: tall face, base bar. */
+.specimen__cue--banner i {
+  inset: 16% 20% 26% 52%;
+  background: none;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+.specimen__cue--banner::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 20%;
+  inset-inline: 46% 14%;
+  height: 4px;
+  background: currentColor;
+  border-radius: var(--radius-sm);
+}
+
+/* Garment weave, as ruled threads. */
+.specimen__cue--weave i { inset-block: 24% 24%; width: 2px; opacity: 0.75; }
+.specimen__cue--weave i:nth-child(1) { inset-inline-start: 46%; }
+.specimen__cue--weave i:nth-child(2) { inset-inline-start: 53%; }
+.specimen__cue--weave i:nth-child(3) { inset-inline-start: 60%; }
+.specimen__cue--weave i:nth-child(4) { inset-inline-start: 67%; }
+.specimen__cue--weave i:nth-child(5) { inset-inline-start: 74%; }
+.specimen__cue--weave i:nth-child(6) { inset-inline-start: 81%; }
+
+/* Wall piece: outer frame with an inner mount. */
+.specimen__cue--frame i {
+  inset: 20% 16% 26% 48%;
+  background: none;
+  border: 2px solid currentColor;
+}
+.specimen__cue--frame::after {
+  content: '';
+  position: absolute;
+  inset: 27% 23% 33% 55%;
+  border: 1px solid currentColor;
+  opacity: 0.7;
+}
+
+/* Desktop and mobile viewports. */
+.specimen__cue--screen i:nth-child(1) {
+  inset: 24% 16% 34% 44%;
+  background: none;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+.specimen__cue--screen i:nth-child(2) {
+  inset: 40% 18% 22% 78%;
+  background: none;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+
+/* Registration target. */
+.specimen__cue--registration i:nth-child(1) {
+  inset-block-start: 26%; inset-inline-end: 18%;
+  width: 44px; height: 44px;
+  background: none;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-full);
+}
+.specimen__cue--registration i:nth-child(2) {
+  inset-block-start: 26%; inset-inline-end: 39%;
+  width: 2px; height: 44px;
+}
+.specimen__cue--registration::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 47%;
+  inset-inline-end: 18%;
+  width: 44px;
+  height: 2px;
+  background: currentColor;
+}
+
+/* ── Category card ───────────────────────────────────────────────────────── */
+
+.category-card {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  transition: border-color var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+.category-card:hover { border-color: var(--blue-600); }
+.category-card:hover .specimen--paper { background: var(--blue-050); }
+.category-card:hover .specimen__mark { color: var(--blue-300); }
+.category-card:hover .specimen--ink .specimen__mark,
+.category-card:hover .specimen--brand .specimen__mark,
+.category-card:hover .specimen--deep .specimen__mark { color: rgb(255 255 255 / 0.36); }
+
+.category-card__body { display: grid; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2); }
+.category-card__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--size-h3);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-heading);
+}
+.category-card__name .arrow { color: var(--blue-600); transition: transform var(--duration) var(--ease); flex: none; }
+.category-card:hover .category-card__name .arrow { transform: translateX(4px); }
+/* The descriptor is the category's real child services, never invented copy. */
+.category-card__services { font-size: var(--size-caption); color: var(--text-muted); line-height: var(--leading-normal); }
+
+/* ── Hero specimen ───────────────────────────────────────────────────────── */
+
+.hero-specimen {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--ink-900);
+  color: var(--paper);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+@media (min-width: 62rem) { .hero-specimen { aspect-ratio: 5 / 6; } }
+.hero-specimen .specimen__crops { color: rgb(255 255 255 / 0.4); }
+
+/* Press colour bar: solid swatches, the strip used to check ink on a sheet. */
+.hero-specimen__bar {
+  position: absolute;
+  inset-block-start: var(--space-5);
+  inset-inline: var(--space-6);
+  display: grid;
+  grid-auto-flow: column;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.hero-specimen__bar i { display: block; }
+.hero-specimen__bar i:nth-child(1) { background: var(--blue-300); }
+.hero-specimen__bar i:nth-child(2) { background: var(--blue-500); }
+.hero-specimen__bar i:nth-child(3) { background: var(--blue-600); }
+.hero-specimen__bar i:nth-child(4) { background: var(--blue-800); }
+.hero-specimen__bar i:nth-child(5) { background: var(--paper); }
+
+.hero-specimen__body { display: grid; justify-items: center; gap: var(--space-2); }
+.hero-specimen__eyebrow {
+  font-size: var(--size-eyebrow);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--blue-400);
+  font-weight: var(--weight-semibold);
+}
+/* A type specimen, set the way a foundry shows a face. */
+.hero-specimen__type {
+  font-size: clamp(5rem, 14vw, 8rem);
+  font-weight: var(--weight-bold);
+  font-stretch: 120%;
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  color: var(--paper);
+}
+.hero-specimen__meta {
+  font-size: var(--size-caption);
+  color: rgb(255 255 255 / 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stated in the visual as well as to assistive technology, so nobody mistakes
+   this for a photograph of a real Motion job. */
+.hero-specimen__note {
+  position: absolute;
+  inset-block-end: var(--space-5);
+  inset-inline: var(--space-6);
+  text-align: center;
+  font-size: var(--size-caption);
+  color: rgb(255 255 255 / 0.5);
+  border-block-start: var(--border-width) solid rgb(255 255 255 / 0.18);
+  padding-block-start: var(--space-3);
+}

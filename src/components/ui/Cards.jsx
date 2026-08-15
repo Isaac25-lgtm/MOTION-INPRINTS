@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { Frame } from './Media'
 import { Price } from './Price'
 import { Icon } from './Icon'
+import { CategorySpecimen } from '../../features/home/Specimen'
+import { resolveCategoryImage } from '../../features/home/placeholderImagery'
 
 /* Product: image, name, descriptor, price. No container, no border, no shadow —
    the grid gap does the separating. */
@@ -40,15 +42,41 @@ export function ProjectCard({ project, ratio = 'landscape', sizes = '(min-width:
   )
 }
 
-/* Category: a photograph with the name set beneath — not a coloured icon box. */
-export function CategoryTile({ category, ratio = 'landscape' }) {
+/* Category card.
+ *
+ * A photograph when one exists; otherwise a designed print specimen rather than
+ * an empty grey box — the catalogue has to look considered before Motion's
+ * photography arrives, because that is the state it launches in.
+ *
+ * The descriptor is the category's real child services joined together. It is
+ * never invented copy: if a category has no children, the line is simply absent.
+ */
+export function CategoryTile({ category, services = [], ratio = 'landscape' }) {
+  const descriptor = services.map(service => service.name).join(' · ')
+  /* A real image from the database, else a licensed illustrative photograph
+     where one has been verified, else a designed specimen. Categories without a
+     suitable verified photograph keep the specimen rather than borrowing an
+     unrelated stock image just to fill the grid. */
+  const image = resolveCategoryImage(category)
   return (
-    <Link to={`/shop/${category.slug}`} className="category">
-      <Frame src={category.image} alt={category.name} ratio={ratio} sizes="(min-width: 60rem) 30vw, 45vw" label="Category image pending" />
-      <div className="category__name">
-        <span>{category.name}</span>
-        <Icon name="arrowRight" size={18} className="arrow" />
-      </div>
+    <Link
+      to={`/shop/${category.slug}`}
+      className="category-card"
+      aria-label={descriptor ? `${category.name}: ${descriptor}` : category.name}
+    >
+      {image
+        ? <Frame src={image.src} alt="" ratio={ratio} sizes="(min-width: 60rem) 30vw, 45vw" />
+        : <CategorySpecimen slug={category.slug} />}
+      <span className="category-card__body">
+        <span className="category-card__name">
+          {category.name}
+          <Icon name="arrowRight" size={20} className="arrow" />
+        </span>
+        {/* Real child services, or the category's own description if it has one. */}
+        {(descriptor || category.description) && (
+          <span className="category-card__services">{descriptor || category.description}</span>
+        )}
+      </span>
     </Link>
   )
 }

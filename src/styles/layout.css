@@ -26,13 +26,48 @@
   background: var(--bg-inverse);
   color: var(--text-inverse);
   --text: var(--text-inverse);
-  --text-muted: #a8adb6;
+  --text-muted: var(--on-inverse-muted);
   --border: var(--border-inverse);
-  --border-strong: #3d434c;
+  --border-strong: var(--on-inverse-border);
   /* On near-black the darkened accent would disappear; the lighter step carries
      the brand colour at 6.4:1 instead. */
   --text-accent: var(--blue-500);
 }
+
+/* Blue surfaces. Colour is what makes this read as a print company rather than a
+   blank document, so whole bands carry it — with every dependent token remapped
+   so text, borders and buttons stay legible without any component knowing it is
+   sitting on blue. */
+.section--brand {
+  background: var(--bg-brand);
+  color: var(--text-inverse);
+  --text: var(--text-inverse);
+  --text-muted: var(--on-brand-muted);
+  --text-accent: var(--paper);
+  --border: rgb(255 255 255 / 0.22);
+  --border-strong: rgb(255 255 255 / 0.42);
+  --action-bg: var(--paper);
+  --action-bg-hover: var(--blue-050);
+  --action-text: var(--blue-800);
+  --focus-ring: var(--paper);
+}
+
+.section--brand-deep {
+  background: var(--bg-brand-deep);
+  color: var(--text-inverse);
+  --text: var(--text-inverse);
+  --text-muted: var(--on-brand-deep-muted);
+  --text-accent: var(--blue-400);
+  --border: rgb(255 255 255 / 0.16);
+  --border-strong: rgb(255 255 255 / 0.34);
+  --action-bg: var(--blue-500);
+  --action-bg-hover: var(--blue-400);
+  --action-text: var(--blue-900);
+  --focus-ring: var(--blue-300);
+}
+
+/* A pale blue wash — colour without the weight of a full band. */
+.section--soft { background: var(--bg-brand-soft); }
 
 /* Section header: eyebrow + heading left-aligned, optional action pushed right.
    Deliberately not centred — centred heading stacks are the template tell. */
@@ -58,8 +93,11 @@
 @media (min-width: 48rem) { .grid--products { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 72rem) { .grid--products { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
-.grid--categories { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 60rem) { .grid--categories { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Category specimens carry a name and a list of services, so two-up on a phone
+   would crush both. One column below 34rem, two on tablet, three on desktop. */
+.grid--categories { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 34rem) { .grid--categories { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 62rem) { .grid--categories { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .grid--pair { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 48rem) { .grid--pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
