@@ -1,3 +1,6 @@
+# Frontend only. The secure API is deployed separately to a Neon-compatible
+# runtime and is deliberately not described here — nothing in this file may
+# create a backend service, a database, or hold a secret.
 services:
   - type: web
     name: motion-frontend
@@ -8,3 +11,24 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+    # `sync: false` declares the variable without a value, so Render prompts for
+    # each one during the Blueprint import instead of deploying without them.
+    #
+    # These are the three the browser needs, and all three are public by design —
+    # Vite embeds them in the bundle at build time. That is also why a value is
+    # never written here: a committed URL would be wrong for someone else's
+    # deployment, and the habit of putting values in this file is how a secret
+    # eventually lands in it. DATABASE_URL, Neon secrets and passwords belong to
+    # the API runtime and must never appear in a static site's environment.
+    #
+    # Without VITE_API_BASE_URL the build still succeeds and the deploy still
+    # goes green, but `assertRuntimeConfig()` throws before React renders and the
+    # site is a blank page. Prompting is what prevents that first deploy.
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_NEON_AUTH_URL
+        sync: false
+      - key: VITE_NEON_AUTH_GOOGLE
+        sync: false
