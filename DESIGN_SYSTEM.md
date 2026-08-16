@@ -117,7 +117,7 @@ Homepage order: **warm-paper hero** → white categories → warm Selected Work 
 
 Two changes from the previous rhythm. The hero moved off clinical white onto warm paper, closed by a stone hairline that is the whole transition into "What we make" — no divider graphic. And the footer left `--bg-brand-deep`: it and Digital Solutions were literally the same token, so the page ended on two indistinguishable dark bands. Digital Solutions is now deep ink-blue `#12232e` (still the brand's hue family, but ink rather than corporate blue, and white lifts from 11.1:1 to 16.1:1); the footer is neutral near-black `#0d0f11` with no blue in it.
 
-Emphasis without a coloured field: a marked eyebrow (`.t-eyebrow--accent`), a short blue rule (`.accent-rule`), the accent button, and layout weight. That is how Custom Work is emphasised — it was a full blue band, which put two saturated sections in a row and turned colour into a layout habit.
+Emphasis without a coloured field: a marked eyebrow (`.t-eyebrow--accent`), a short **terracotta** rule (`.accent-rule`), the accent button, and layout weight. That is how Custom Work is emphasised — it was a full blue band, which put two saturated sections in a row and turned colour into a layout habit. The rule moved off blue so the editorial palette gets an outing beyond the hero, and so blue stays where it identifies rather than decorates.
 
 Each band remaps `--text`, `--text-muted`, `--border` and the action tokens, so a button or empty state inside one adapts without knowing where it sits. No component contains a colour conditional.
 
@@ -133,7 +133,9 @@ It is gone, along with the test that enforced it. **Two adjacent white or warm b
 
 Text only, by explicit art direction. Four treatments were tried and rejected on screen — a type specimen, a wide-format printer, a hand-pulled screen print, and a process-colour guide. The last was the best of them and still lost: it made the fold tall, opened the page with a large field of blue, and pushed category discovery below the first viewport.
 
-The hero is now a compact centred masthead: eyebrow, `Design. / Print. / Brand.` at the 3.5rem cap, a short blue rule, one factual sentence and two actions. Blue appears only as the eyebrow, the rule, the primary action and the focus ring.
+The hero is a compact centred masthead on **warm paper**: a neutral kicker, `Design. / Print. / Brand.` at the 3.5rem cap with a **coloured full stop on each word** — terracotta, Motion blue, ochre — one factual sentence in warm grey, and two actions whose primary is **ink black**. A narrow production rail sits above it, and a stone hairline closes the sheet into "What we make".
+
+The short blue underline that used to sit beneath the statement is gone; the coloured periods replaced it. The primary action is no longer a blue block. Blue now appears on this fold exactly twice: the middle full stop, and one registration mark in the rail.
 
 **Do not add an image, specimen, mockup, gradient or abstract visual here** without an explicit decision from the owner. `tests/pages.test.jsx` fails if one appears. The CMS hero image field remains in the schema but nothing renders it.
 

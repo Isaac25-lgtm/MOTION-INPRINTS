@@ -2,6 +2,8 @@
 
 Audit of the design system and public site. Records what was checked, what was changed, and what cannot be signed off without real photography and a device.
 
+> **Current state, as of the fifth pass.** The homepage hero is a centred, text-only masthead on warm paper: a neutral kicker, `Design. / Print. / Brand.` with terracotta / Motion-blue / ochre full stops, supporting copy in warm grey, an ink-black primary action beside a stone-bordered secondary, and a narrow production rail above it. One deep ink-blue band (Digital Solutions) and a near-black footer. **There is no hero image, no blue underline and no blue primary button.** Sections below describe how it got here, in order; where an earlier section describes a treatment that was later replaced, it says so.
+
 ## The governing question
 
 > A Kampala printing and branding company with strong creative direction, or a prompt-generated template with Motion content pasted in?
@@ -50,7 +52,9 @@ Four hero treatments were built and rejected on screen:
 
 Underneath all four sat a structural problem: nearly every stock workshop photograph is recognisably *somewhere else* — a Paris etching studio, a Vietnamese flag workshop, a European factory with a competitor's name painted on the wall. A visibly foreign hero undercuts a Kampala company.
 
-**The hero is now text only**: eyebrow, `Design. / Print. / Brand.` at the 3.5rem cap, a short blue rule, one factual sentence, two actions, centred. No chip row, and no service list beneath the buttons — that list duplicated the category section immediately below it.
+**The hero is now text only**: kicker, `Design. / Print. / Brand.` at the 3.5rem cap, one factual sentence, two actions, centred. No chip row, and no service list beneath the buttons — that list duplicated the category section immediately below it.
+
+*(The blue rule this pass introduced beneath the statement was itself removed in the fifth pass above, replaced by the coloured full stops. The composition described in that section is the current one.)*
 
 `hero-colour.jpg` was **deleted, not parked**. A placeholder with no approved placement is exactly the asset that later drifts onto a portfolio or product surface, where it would assert work Motion did not do. It is re-downloadable from the source URL recorded in `src/assets/photos/SOURCES.md`.
 

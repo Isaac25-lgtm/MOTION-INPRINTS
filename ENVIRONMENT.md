@@ -89,16 +89,27 @@ No Google client secret exists in this repository, and none should.
 
 Everyone who signs up is a `customer`. There is no HTTP route, UI control, environment variable or automatic first-user rule that grants `admin` — promotion is a server-only script requiring database access.
 
+**The profile row is created by the application, not by signing in.** A new account has a Neon Auth identity and no `public.user_profiles` row; the row appears when the owner saves the profile form once. The promotion script refuses to run before that, and refuses to create the row itself — so step 2 is not optional.
+
 ```bash
-# 1. The owner signs up and signs in ONCE, so the app creates their profile row.
+# 1. Create the owner account and sign in (email/password, or Google).
+#    With email verification on, follow the emailed link first.
 
-# 2. Find the exact Neon Auth user id — Neon Console → Auth → Users, or:
+# 2. Go to Account -> Profile and save your details ONCE.
+#    A new account is sent there automatically. This is what creates the
+#    public.user_profiles row the next step needs.
+
+# 3. Find the exact Neon Auth user id — Neon Console -> Auth -> Users, or:
 #      SELECT id, email FROM neon_auth."user" ORDER BY "createdAt" DESC LIMIT 10;
+#    To confirm the profile exists and see what the script can act on:
+node --env-file=.env scripts/promote-admin.js --list
 
-# 3. Promote that exact id:
+# 4. Promote that exact id:
 node --env-file=.env scripts/promote-admin.js <auth_user_id>
 
-# 4. Sign out and back in — the browser caches the profile for the session.
+# 5. Sign out and back in — the browser holds the profile for the session.
+
+# 6. Open /admin.
 ```
 
 Supporting commands:
@@ -109,6 +120,25 @@ node --env-file=.env scripts/promote-admin.js <auth_user_id> --demote
 ```
 
 The script takes an **exact `auth_user_id`** — never "the earliest profile", an email, or a name. Every convenience alternative promotes the wrong account the day two people sign up in the same minute. It **refuses to run if no matching profile exists** and never creates one, and it reports exactly which profile changed.
+
+## Real-browser test checklist
+
+Automated tests cover token verification, role enforcement and the onboarding form. These are the paths that need a real browser and a real inbox — none can be proven headlessly.
+
+Run at **`http://localhost:5173`**, not `127.0.0.1` (see trusted origins above).
+
+| # | Check | Pass when |
+| --- | --- | --- |
+| 1 | **Sign up with a non-Gmail address** — Outlook, Proton, or a work address | Account is created; the page says to confirm your email rather than claiming you are signed in |
+| 2 | **Email verification** | The emailed link works; signing in before it fails with "confirm your email address first" and a resend action, not a wrong-password message |
+| 3 | **First profile** | After the first sign-in you land on Account → Profile showing **"Complete your profile"** — a usable form, not an error. Saving succeeds and the account nav appears without a manual reload |
+| 4 | **Customer access** | `/account`, `/account/orders`, `/account/quotes` all load |
+| 5 | **Google sign-in** | "Continue with Google" completes and returns to the site signed in; a brand-new Google account is sent to the profile form as in 3 |
+| 6 | **Owner promotion** | `promote-admin.js --list` shows the profile; promoting the exact id reports one profile changed |
+| 7 | **Admin access after re-login** | Sign out, sign back in, `/admin` loads. **Before** re-login it should still refuse — the profile is held for the session |
+| 8 | **Customer denial** | From a second, unpromoted account, `/admin` redirects to `/account`, and `GET /api/admin/products` returns **403** |
+
+Check 8 matters most: 7 proves the grant works, 8 proves it is a grant rather than an open door. Test it with the browser devtools network tab, not only the redirect — the redirect is rendering, the 403 is the security.
 
 ## What still needs doing in the Neon console
 

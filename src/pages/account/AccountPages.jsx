@@ -335,16 +335,46 @@ export function AccountReorderPage() {
 
 /* ── Profile ──────────────────────────────────────────────────────────────── */
 
+/* Profile — onboarding and editing, which are two different jobs.
+ *
+ * A newly authenticated customer has a Neon Auth identity but no Motion profile
+ * row, and the route guard sends them here to create one. `GET /me` answers 403
+ * `profile_required` for exactly that person. Treating it as a fetch failure —
+ * which is what this page used to do — showed a dead error with a Retry button
+ * that could only produce the same 403 again. That blocked every new customer,
+ * and with them the owner bootstrap, since the promotion script needs a profile
+ * row to exist before it will do anything.
+ *
+ * A missing profile is an expected onboarding state, not an error. The two are
+ * now distinguished, and the form posts or patches accordingly.
+ */
 export function AccountProfilePage() {
   const notify = useToast()
+  const { user, refreshProfile } = useAuth()
   const state = useResource(({ signal }) => accountService.profile({ signal }), [])
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
 
-  const current = form || (state.data ? {
-    fullName: state.data.full_name || '', phone: state.data.phone || '', companyName: state.data.company_name || '',
-  } : null)
+  /* 403 profile_required is the server saying "authenticated, but no profile
+     yet". 404 is treated the same way for robustness. Anything else is a real
+     failure and keeps the error state. */
+  const missingProfile = state.error?.status === 403 || state.error?.status === 404
+  const loadFailed = Boolean(state.error) && !missingProfile
+  const creating = missingProfile && !state.data
+
+  const blank = {
+    /* Prefilled from the Neon Auth identity when it carries a name — a Google
+       sign-in usually does, an email sign-up carries whatever was typed. It is a
+       convenience only: the field stays editable and nothing depends on it. */
+    fullName: user?.name || '',
+    phone: '',
+    companyName: '',
+  }
+
+  const current = form || (state.data
+    ? { fullName: state.data.full_name || '', phone: state.data.phone || '', companyName: state.data.company_name || '' }
+    : (creating ? blank : null))
 
   const set = (name) => (event) => setForm({ ...current, [name]: event.target.value })
 
@@ -352,12 +382,24 @@ export function AccountProfilePage() {
     event.preventDefault()
     setSaving(true); setErrors({})
     try {
-      await accountService.updateProfile(current)
-      notify('Your details have been saved.', 'success')
+      /* The only difference between the two paths. Neither body carries a role,
+         an auth id or an email — the server fixes the role to 'customer' on
+         insert and never reads one from the request. */
+      if (creating) {
+        await accountService.createProfile(current)
+        notify('Your profile is set up. Welcome to Motion.', 'success')
+        /* Refresh the session's profile before reloading this page's copy, so
+           the customer routes and the account nav become available immediately
+           rather than after a manual reload. */
+        await refreshProfile()
+      } else {
+        await accountService.updateProfile(current)
+        notify('Your details have been saved.', 'success')
+      }
       state.reload()
     } catch (error) {
       if (error.details) setErrors(Object.fromEntries(Object.entries(error.details).map(([key, value]) => [key, value[0]])))
-      notify(error.message || 'Your details could not be saved.', 'error')
+      notify(error.message || (creating ? 'Your profile could not be created.' : 'Your details could not be saved.'), 'error')
     } finally { setSaving(false) }
   }
 
@@ -365,24 +407,37 @@ export function AccountProfilePage() {
     <div className="container">
       <div className="page-head">
         <Breadcrumbs trail={[{ to: '/account', label: 'Account' }, { label: 'Profile' }]} />
-        <h1 className="t-h1 page-head__title">Your details</h1>
+        <h1 className="t-h1 page-head__title">{creating ? 'Complete your profile' : 'Your details'}</h1>
+        {creating && (
+          <p className="t-body-lg t-muted t-measure">
+            One step before your account is ready. We use this on quotes, orders and delivery.
+          </p>
+        )}
       </div>
-      <AccountNav />
+      {/* The account nav links to orders and quotes, which a customer without a
+          profile cannot reach yet. Hidden until there is one. */}
+      {!creating && <AccountNav />}
 
       <div className="section container--narrow" style={{ paddingInline: 0 }}>
         {state.loading && <LoadingState label="Loading your details" />}
-        {state.error && <ErrorState title="Your details could not be loaded" onRetry={state.reload} />}
+        {loadFailed && <ErrorState title="Your details could not be loaded" description={state.error.message} onRetry={state.reload} />}
         {current && (
           <form className="stack stack--lg" onSubmit={save} noValidate>
             <Field label="Full name" value={current.fullName} onChange={set('fullName')} error={errors.fullName} required autoComplete="name" />
             <Field label="Phone number" type="tel" value={current.phone} onChange={set('phone')} error={errors.phone} optional autoComplete="tel" />
             <Field label="Company or organisation" value={current.companyName} onChange={set('companyName')} error={errors.companyName} optional autoComplete="organization" />
             {/* Role, identifiers and account status are deliberately absent: they
-                are not the customer's to change (Prompt 9.1). */}
+                are not the customer's to change (Prompt 9.1). The server would
+                ignore them anyway — the schema strips unknown keys and the role
+                is a literal in the handler. */}
             <p className="t-caption">
               To change the email address you sign in with, or to close your account, contact us.
             </p>
-            <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : 'Save details'}</Button>
+            <Button type="submit" variant="primary" disabled={saving}>
+              {saving
+                ? (creating ? 'Setting up…' : 'Saving…')
+                : (creating ? 'Save and continue' : 'Save details')}
+            </Button>
           </form>
         )}
       </div>

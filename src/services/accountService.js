@@ -10,6 +10,16 @@ import { request } from './apiClient'
 export const accountService = {
   /** @returns {Promise<{id: string, full_name: string, phone: string|null, company_name: string|null}>} */
   profile: (options) => request('/me', options),
+
+  /* First profile after sign-up. Distinct from updateProfile because the server
+     routes them differently: POST inserts with the role fixed to 'customer',
+     PATCH touches only name, phone and company. Neither accepts a role, and the
+     browser has no way to ask for one.
+
+     This existed on authService and was never wired to anything, so a newly
+     authenticated user reached /account/profile, GET /me answered
+     profile_required, and the page rendered an error they could not clear. */
+  createProfile: (body, options) => request('/me', { ...options, method: 'POST', body }),
   updateProfile: (body, options) => request('/me', { ...options, method: 'PATCH', body }),
 
   orders: (options) => request('/orders', options),

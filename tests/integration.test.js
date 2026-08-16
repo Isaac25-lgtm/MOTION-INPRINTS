@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import pg from 'pg'
 import { createApi } from '../server/api.js'
 import { PAYMENT_STATUS, verifyAndSettle } from '../server/payments.js'
@@ -777,5 +779,84 @@ describeIfDb('schema behaviour (real database)', () => {
       expect((await client.query('SELECT artwork_status FROM public.order_items WHERE id=$1', [item.id])).rows[0].artwork_status).toBe('awaiting_upload')
       expect((await client.query('SELECT status_code FROM public.orders WHERE id=$1', [order.id])).rows[0].status_code).toBe('artwork_required')
     })
+  })
+})
+
+/* Owner bootstrap.
+ *
+ * The promotion script is the only path to `admin` — there is no HTTP route, no
+ * UI control and no environment variable. It runs as a real subprocess here,
+ * because what matters is its refusal behaviour at the boundary, not a function
+ * call: it must never invent a profile for an id that has not signed in, and it
+ * must never accept anything looser than an exact auth_user_id.
+ */
+describeIfDb('owner promotion script', () => {
+  const run = promisify(execFile)
+
+  /** Runs the script and returns { code, out } without throwing on failure. */
+  const promote = async (args) => {
+    try {
+      const { stdout } = await run(process.execPath, ['--env-file=.env', 'scripts/promote-admin.js', ...args], { cwd: process.cwd() })
+      return { code: 0, out: stdout }
+    } catch (error) {
+      return { code: error.code ?? 1, out: `${error.stdout || ''}${error.stderr || ''}` }
+    }
+  }
+
+  let client
+  const TEST_ID = '3f1b7c92-5d4e-4a81-9c02-7e6f5a4b3c21'
+
+  beforeAll(async () => {
+    client = new pg.Client({ connectionString: url })
+    await client.connect()
+    await client.query('DELETE FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
+  })
+  afterAll(async () => {
+    await client.query('DELETE FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
+    await client.end()
+  })
+
+  it('refuses an id that has no profile, and creates nothing', async () => {
+    const result = await promote([TEST_ID])
+    expect(result.code, 'must exit non-zero').not.toBe(0)
+    expect(result.out).toMatch(/No profile exists/i)
+    expect(result.out).toMatch(/never creates one/i)
+
+    const { rows } = await client.query('SELECT 1 FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
+    expect(rows, 'the script must not insert a profile row').toHaveLength(0)
+  })
+
+  it('refuses anything that is not an exact auth_user_id', async () => {
+    for (const bad of ['owner@example.com', 'Amina Nakato', 'first', '123']) {
+      const result = await promote([bad])
+      expect(result.code, `"${bad}" must be rejected`).not.toBe(0)
+      expect(result.out).toMatch(/not a valid auth_user_id/i)
+    }
+  })
+
+  it('promotes exactly the profile it was given, and is idempotent', async () => {
+    await client.query(
+      "INSERT INTO public.user_profiles(auth_user_id, role, full_name) VALUES($1, 'customer', 'Bootstrap Test')",
+      [TEST_ID],
+    )
+
+    const first = await promote([TEST_ID])
+    expect(first.code).toBe(0)
+    expect(first.out).toMatch(/Promoted exactly one profile/i)
+    expect(first.out).toContain(TEST_ID)
+
+    const { rows } = await client.query('SELECT role FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
+    expect(rows[0].role).toBe('admin')
+
+    // Running it again changes nothing rather than erroring.
+    const again = await promote([TEST_ID])
+    expect(again.code).toBe(0)
+    expect(again.out).toMatch(/No change/i)
+
+    // And it reverses cleanly, so a mistaken promotion is recoverable.
+    const demoted = await promote([TEST_ID, '--demote'])
+    expect(demoted.code).toBe(0)
+    const after = await client.query('SELECT role FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
+    expect(after.rows[0].role).toBe('customer')
   })
 })

@@ -22,12 +22,15 @@ environment variable that grants `admin`, and no automatic "first user wins"
 rule — promotion needs a shell on the server and the database credential.
 
 ```sh
-# 1. The owner signs up and signs in ONCE, so the app creates their profile.
-# 2. Get their exact Neon Auth user id — Neon Console -> Auth -> Users, or:
+# 1. Create the owner account and sign in (verify the email if prompted).
+# 2. Go to Account -> Profile and SAVE DETAILS ONCE.
+#    This creates the public.user_profiles row. Signing in alone does not —
+#    the script refuses to run without it, and will not create one itself.
+# 3. Get the exact Neon Auth user id — Neon Console -> Auth -> Users, or:
 #      SELECT id, email FROM neon_auth."user" ORDER BY "createdAt" DESC LIMIT 10;
-# 3. Promote that exact id:
+# 4. Promote that exact id:
 node --env-file=.env scripts/promote-admin.js <auth_user_id>
-# 4. Sign out and back in.
+# 5. Sign out and back in, then open /admin.
 
 node --env-file=.env scripts/promote-admin.js --list      # who exists, and their roles
 node --env-file=.env scripts/promote-admin.js <id> --demote
