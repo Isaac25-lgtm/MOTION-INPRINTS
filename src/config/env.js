@@ -1,5 +1,28 @@
 const valueOf = (value = '') => String(value ?? '').trim()
 
+/* Normalises the API base URL so a bare origin works.
+ *
+ * The Render Blueprint wires this from the API service's RENDER_EXTERNAL_URL,
+ * which is an origin with no path — `https://motion-api.onrender.com`. The
+ * client appends resource paths (`/products`, `/me`), so it needs the `/api`
+ * prefix too, and render.yaml has no string interpolation to add one.
+ *
+ * So it is added here when the value carries no path of its own. A URL that
+ * already has one is left exactly as given, which keeps
+ * `http://localhost:8787/api` and any custom mount point working untouched.
+ */
+function normaliseApiBaseUrl(value) {
+  if (!value) return ''
+  const trimmed = value.replace(/\/+$/, '')
+  try {
+    const url = new URL(trimmed)
+    return url.pathname === '/' || url.pathname === '' ? `${url.origin}/api` : trimmed
+  } catch {
+    // Not absolute — a dev proxy path such as `/api`. Left for validation below.
+    return trimmed
+  }
+}
+
 /* Browser configuration.
  *
  * Everything here ships in the bundle and is therefore public by definition.
@@ -8,7 +31,7 @@ const valueOf = (value = '') => String(value ?? '').trim()
 export const env = Object.freeze({
   appName: valueOf(import.meta.env.VITE_APP_NAME) || 'Motion',
   appUrl: valueOf(import.meta.env.VITE_APP_URL),
-  apiBaseUrl: valueOf(import.meta.env.VITE_API_BASE_URL),
+  apiBaseUrl: normaliseApiBaseUrl(valueOf(import.meta.env.VITE_API_BASE_URL)),
 
   /* Neon Auth (Managed Better Auth) base URL — the only auth value the browser
      needs, and deliberately public.

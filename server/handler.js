@@ -23,14 +23,32 @@ function fingerprint(value) {
 // Only a header the deployment runtime is known to overwrite may be trusted, so it is named in configuration.
 // Returns null when the caller cannot be distinguished; the handler then skips limiting rather than
 // forcing every visitor into one shared bucket, which would rate-limit the whole site as a single client.
+/* Rate-limit identity, in order of how much the value can be trusted.
+ *
+ * The session comes FIRST. It used to come second, which was the wrong way
+ * round: with a trusted header configured, every request — including
+ * authenticated ones — was bucketed by that header, so a caller who could
+ * influence it could widen or escape their own session's bucket. Checking the
+ * credential first means a client-supplied IP header can never do that; the
+ * header now only identifies callers who present no credential at all.
+ *
+ * Neither value is verified at this point — the limiter runs before
+ * authentication, by design, so an unverified request cannot consume database
+ * work. A caller rotating Authorization values does get fresh buckets, but each
+ * rotated value then fails JWKS verification, so it buys nothing. The limiter is
+ * a cost control, not an authorisation boundary.
+ *
+ * `trustedClientHeader` is only ever set to a header the runtime is known to
+ * OVERWRITE. See serverConfig() for why that is null on Render.
+ */
 export function createClientKeyResolver({ trustedClientHeader } = {}) {
   return (request) => {
+    const authorization = request.headers.get('authorization')
+    if (authorization) return `session:${fingerprint(authorization)}`
     if (trustedClientHeader) {
       const forwarded = request.headers.get(trustedClientHeader)?.split(',')[0].trim()
       if (forwarded) return `client:${forwarded}`
     }
-    const authorization = request.headers.get('authorization')
-    if (authorization) return `session:${fingerprint(authorization)}`
     return null
   }
 }

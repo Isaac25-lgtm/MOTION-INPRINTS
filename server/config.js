@@ -31,10 +31,30 @@ export function serverConfig(source = process.env) {
   const missing = required.filter(name => !source[name])
   if (missing.length) throw new Error(`Missing required server environment variables: ${missing.join(', ')}`)
   validateAuth(source.NEON_AUTH_JWKS_URL, source.NEON_AUTH_ISSUER)
-  const trustedClientHeader = (source.API_TRUSTED_CLIENT_HEADER || '').trim().toLowerCase()
-  // Without a runtime-controlled client header, anonymous callers cannot be told apart and go unlimited.
-  // That is workable while developing but must never reach production, so refuse to start instead.
-  if (!trustedClientHeader && source.NODE_ENV === 'production') throw new Error('API_TRUSTED_CLIENT_HEADER must name the header your API runtime sets to the real client address before running in production.')
+  /* Rate-limit identity for anonymous callers.
+   *
+   * This must name a header the runtime OVERWRITES. A header the runtime merely
+   * appends to is client-supplied, and naming one is worse than naming none:
+   * `createClientKeyResolver` would hand every anonymous caller a bucket they
+   * choose for themselves, while the code reads as though limiting is in force.
+   *
+   * Render appends to `X-Forwarded-For` rather than replacing it, so its first
+   * value is attacker-controlled. Cloudflare's `CF-Connecting-IP` is overwritten
+   * at Cloudflare's edge, but Render does not document it and an application
+   * cannot verify from inside that a request actually arrived through that edge,
+   * so trusting it would just move the same assumption somewhere less visible.
+   *
+   * Hence the literal `none`: a deliberate, greppable statement that this
+   * platform offers no trustworthy header and anonymous callers are therefore
+   * not rate limited. It satisfies the production guard because it is a decision
+   * on the record, not an empty variable someone forgot to set — which is the
+   * only thing the guard was ever there to catch.
+   */
+  const declared = (source.API_TRUSTED_CLIENT_HEADER || '').trim().toLowerCase()
+  if (!declared && source.NODE_ENV === 'production') {
+    throw new Error('API_TRUSTED_CLIENT_HEADER must name the header your API runtime OVERWRITES with the real client address, or the literal "none" if the platform provides no such header. Naming a header the platform merely appends to lets any caller choose their own rate-limit bucket.')
+  }
+  const trustedClientHeader = declared === 'none' ? null : declared
   return Object.freeze({
     databaseUrl: source.DATABASE_URL,
     authJwksUrl: source.NEON_AUTH_JWKS_URL,

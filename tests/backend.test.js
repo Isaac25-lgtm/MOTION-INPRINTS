@@ -149,6 +149,43 @@ describe('backend access and input rules', () => {
     }
     expect(() => serverConfig({ ...base, NODE_ENV: 'production' })).toThrow(/API_TRUSTED_CLIENT_HEADER/)
     expect(serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'X-Real-IP' }).trustedClientHeader).toBe('x-real-ip')
+
+    /* Render appends to X-Forwarded-For rather than replacing it, so no header
+       there can be trusted. `none` is how a deployment states that on the
+       record: it satisfies the guard — which exists to catch a variable someone
+       forgot, not a decision someone made — and resolves to no trusted header,
+       so the resolver falls through to session identity. */
+    const acknowledged = serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'none' })
+    expect(acknowledged.trustedClientHeader).toBeNull()
+  })
+
+  /* Naming a header the platform merely appends to is worse than naming none:
+     it hands every caller a bucket of their own choosing while the code reads as
+     though limiting is in force. This pins the ordering that makes a spoofable
+     header unable to affect an authenticated caller. */
+  it('never lets a client-supplied header override session identity', () => {
+    const resolve = createClientKeyResolver({ trustedClientHeader: 'x-forwarded-for' })
+
+    // A caller spoofing the header cannot escape or widen their session bucket.
+    const spoofed = resolve(request('/api/orders', {
+      headers: { authorization: 'Bearer token-a', 'x-forwarded-for': '9.9.9.9' },
+    }))
+    const rotated = resolve(request('/api/orders', {
+      headers: { authorization: 'Bearer token-a', 'x-forwarded-for': '8.8.8.8' },
+    }))
+    expect(spoofed).toBe(rotated)
+    expect(spoofed).toMatch(/^session:/)
+    expect(spoofed).not.toContain('9.9.9.9')
+
+    // The header still identifies callers who present no credential at all.
+    expect(resolve(request('/api/products', { headers: { 'x-forwarded-for': '203.0.113.5' } })))
+      .toBe('client:203.0.113.5')
+
+    // With no trusted header configured, anonymous callers stay unidentifiable
+    // rather than being pooled into one bucket that limits the whole site.
+    const sessionOnly = createClientKeyResolver({ trustedClientHeader: null })
+    expect(sessionOnly(request('/api/products', { headers: { 'x-forwarded-for': '203.0.113.5' } }))).toBeNull()
+    expect(sessionOnly(request('/api/orders', { headers: { authorization: 'Bearer t' } }))).toMatch(/^session:/)
   })
 
   it('applies a partial admin PATCH without demanding every field', async () => {

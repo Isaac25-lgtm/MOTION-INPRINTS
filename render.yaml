@@ -1,7 +1,75 @@
-# Frontend only. The secure API is deployed separately to a Neon-compatible
-# runtime and is deliberately not described here — nothing in this file may
-# create a backend service, a database, or hold a secret.
+# One Blueprint, two services: the secure API and the static frontend.
+#
+# Render assigns both public URLs at creation and wires them to each other with
+# `fromService` + `envVarKey: RENDER_EXTERNAL_URL`, which removes the manual
+# chicken-and-egg of needing each URL before the other exists. Neither
+# *.onrender.com hostname is written here.
+#
+# `property:` is NOT used for this. It exposes `host` / `hostport`, which are
+# private-network addresses — unreachable from a browser and useless as a CORS
+# origin. `envVarKey` reads the service's own RENDER_EXTERNAL_URL, which is the
+# public https:// URL.
+#
+# No database is declared: Postgres and auth are Neon's. No migration runs on
+# deploy — a deploy that silently alters a schema is how a production database
+# gets changed by accident.
+#
+# No secret appears in this file. `sync: false` declares a variable without a
+# value so Render prompts at import; the value is entered in the dashboard.
 services:
+  # ── Secure API ─────────────────────────────────────────────────────────────
+  # `server/render.js` — a thin Node bridge around the Fetch-style handler in
+  # server/index.js. DATABASE_URL and the auth configuration live here and
+  # nowhere else; the static site ships every one of its variables to the
+  # browser, so a secret there is a published secret.
+  - type: web
+    name: motion-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run start:api
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # SECRET. Paste from Neon privately. Never in the frontend service, never
+      # in a VITE_ variable, never in the repository.
+      - key: DATABASE_URL
+        sync: false
+
+      # Public values, but server-side — the browser has no use for them.
+      # JWKS is the auth URL plus /.well-known/jwks.json; ISSUER is its ORIGIN
+      # with no path. serverConfig() refuses to start if they are swapped.
+      - key: NEON_AUTH_JWKS_URL
+        sync: false
+      - key: NEON_AUTH_ISSUER
+        sync: false
+
+      # CORS, sourced from the frontend so the allowed origin is exactly the
+      # deployed site with no hostname written down. RENDER_EXTERNAL_URL is
+      # already a full https:// origin, which is what the check compares against.
+      - key: API_ALLOWED_ORIGINS
+        fromService:
+          name: motion-frontend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # Rate-limit identity. `none` is a decision on the record, not an omission.
+      #
+      # Render APPENDS to X-Forwarded-For rather than replacing it, so its first
+      # value is supplied by the caller. Naming it here would be worse than
+      # naming nothing: every anonymous caller would pick their own bucket while
+      # the configuration read as though limiting were enforced. Cloudflare's
+      # CF-Connecting-IP is overwritten at its edge, but Render does not document
+      # it and the application cannot verify a request arrived through that edge.
+      #
+      # Effect: authenticated callers are limited per session; anonymous callers
+      # are not limited by this service. Trade-off in DEPLOYMENT.md.
+      - key: API_TRUSTED_CLIENT_HEADER
+        value: none
+
+  # ── Static frontend ────────────────────────────────────────────────────────
   - type: web
     name: motion-frontend
     runtime: static
@@ -11,24 +79,21 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-
-    # `sync: false` declares the variable without a value, so Render prompts for
-    # each one during the Blueprint import instead of deploying without them.
-    #
-    # These are the three the browser needs, and all three are public by design —
-    # Vite embeds them in the bundle at build time. That is also why a value is
-    # never written here: a committed URL would be wrong for someone else's
-    # deployment, and the habit of putting values in this file is how a secret
-    # eventually lands in it. DATABASE_URL, Neon secrets and passwords belong to
-    # the API runtime and must never appear in a static site's environment.
-    #
-    # Without VITE_API_BASE_URL the build still succeeds and the deploy still
-    # goes green, but `assertRuntimeConfig()` throws before React renders and the
-    # site is a blank page. Prompting is what prevents that first deploy.
     envVars:
+      # The API's public URL, resolved at Blueprint creation. It arrives as an
+      # origin with no path; `src/config/env.js` appends the `/api` prefix the
+      # client expects, because render.yaml has no string interpolation and the
+      # two cannot be concatenated here.
       - key: VITE_API_BASE_URL
-        sync: false
+        fromService:
+          name: motion-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # Public. The full Neon Auth URL, including the /neondb/auth path.
       - key: VITE_NEON_AUTH_URL
         sync: false
+      # Public. `true` shows the Google button; only the exact string `false`
+      # hides it. Email and password sign-in is available either way.
       - key: VITE_NEON_AUTH_GOOGLE
         sync: false
