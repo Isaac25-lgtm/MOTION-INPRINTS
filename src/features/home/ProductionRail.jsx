@@ -20,12 +20,17 @@
  * element is aria-hidden, which also keeps the moving marker unannounced.
  */
 
+/* Every discipline carries a mark, so the row reads as a complete index rather
+   than as four marked items and one that was forgotten. The last is a neutral
+   stone rather than a fifth colour: four accents is already the whole palette,
+   and another bright mark — blue least of all — would turn a quiet index into a
+   row of dots competing with the headline. */
 const DISCIPLINES = [
   { label: 'Signage', accent: 'terracotta' },
   { label: 'Commercial print', accent: 'blue' },
   { label: 'Apparel', accent: 'ochre' },
   { label: 'Display', accent: 'olive' },
-  { label: 'Digital systems', accent: null },
+  { label: 'Digital systems', accent: 'neutral' },
 ]
 
 export function ProductionRail() {
@@ -35,7 +40,7 @@ export function ProductionRail() {
         <ul className="rail__list">
           {DISCIPLINES.map(({ label, accent }) => (
             <li className="rail__item" key={label}>
-              {accent && <span className={`rail__mark rail__mark--${accent}`} />}
+              <span className={`rail__mark rail__mark--${accent}`} />
               {label}
             </li>
           ))}

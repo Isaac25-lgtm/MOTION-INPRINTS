@@ -59,6 +59,10 @@
   --paper-soft: #faf9f6;  /* barely-there warmth; the quiet default surface */
   --paper-warm: #f5f2ec;  /* the hero surface, and alternating full-bleed bands */
   --stone: #d8d2c8;       /* rules and dividers — decorative, never load-bearing */
+  /* A neutral in the same family, dark enough to read as a deliberate mark
+     (3.2:1 on warm paper) while staying quieter than any accent. Used for the
+     one rail mark that must not be another colour. */
+  --stone-deep: #8e887c;
 
   --accent-terracotta: #a15c44;  /* 4.55:1 on warm paper */
   --accent-ochre: #8a692b;       /* 4.54:1 on warm paper */
@@ -83,7 +87,17 @@
   --state-warning-bg: #fbf2e2;
 
   /* Applied roles. Components reference these, not the ramps above. */
-  --bg: var(--paper);
+
+  /* The page ground is a quiet off-white, not pure white.
+   *
+   * Sections without a band modifier previously sat on #ffffff, which read as
+   * clinical beside the warm-paper hero and made every transition into one a
+   * visible step. At #faf9f6 the whole page is paper of one kind or another and
+   * the bands differ by warmth rather than by brightness.
+   *
+   * `--paper` stays pure white and is still used where white is the point: the
+   * inverse text token, button labels on dark, and the footer's logo panel. */
+  --bg: var(--paper-soft);
   --bg-alt: var(--paper-warm);
   --bg-inverse: var(--ink-900);
   /* Blue surfaces, for the bands that carry the brand through the page.

@@ -111,7 +111,7 @@ function Hero() {
 function Categories() {
   const state = useResource(({ signal }) => categoryService.list({ signal }), [])
   return (
-    <section className="section section--tight" aria-labelledby="categories-title"><div className="container">
+    <section className="section section--tight section--after-hero" aria-labelledby="categories-title"><div className="container">
       <SectionHead
         eyebrow="What we make"
         title={<span id="categories-title">Browse by what you need</span>}

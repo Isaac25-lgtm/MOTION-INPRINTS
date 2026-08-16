@@ -133,6 +133,14 @@ describe('design system constraints', () => {
       [token('ink-900'), token('paper-warm'), 4.5, 'headline on warm paper'],
       [token('ink-body'), token('paper-warm'), 4.5, 'supporting copy on warm paper'],
       [token('ink-body'), token('paper-soft'), 4.5, 'supporting copy on soft paper'],
+      /* Soft paper is now the page ground (`--bg`), not pure white, so the
+         everyday pairings are measured against what they actually sit on. */
+      [token('ink-900'), token('paper-soft'), 4.5, 'body text on the page ground'],
+      [token('blue-text'), token('paper-soft'), 4.5, 'accent text on the page ground'],
+      [token('blue-600'), token('paper-soft'), 3, 'focus ring on the page ground'],
+      /* The rail's neutral mark is decorative, but it still has to be visible
+         enough to read as deliberate rather than as a rendering artefact. */
+      [token('stone-deep'), token('paper-warm'), 3, 'neutral rail mark on warm paper'],
       [token('accent-terracotta'), token('paper-warm'), 4.5, 'terracotta full stop on warm paper'],
       [token('accent-ochre'), token('paper-warm'), 4.5, 'ochre full stop on warm paper'],
       [token('accent-olive'), token('paper-warm'), 4.5, 'olive accent on warm paper'],

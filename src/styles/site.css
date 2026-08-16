@@ -168,15 +168,31 @@
   padding-block: var(--space-6) var(--space-7);
 }
 @media (min-width: 62rem) {
-  /* Tightened from space-7/space-7 (48/48) and a space-5 gap. Measured at
-     1366x768 the old values pushed the actions to ~700px and left nothing of the
-     next section visible; this returns roughly 40px, which is what brings the
-     "What we make" heading above the fold. Spacious, not empty. */
-  .hero { padding-block: var(--space-6) var(--space-7); gap: var(--space-4); }
+  /* Tightened twice. First from space-7/space-7 (48/48) with a space-5 gap,
+     which pushed the actions to ~700px at 1366x768 and left nothing of the next
+     section visible. Now the lower padding drops 48 -> 32px as well.
+
+     The remaining space below the actions is deliberate: the gap between the
+     last button and the divider should read as the end of a sheet, not as a
+     margin someone forgot. Combined with the 32px removed from the category
+     section's top padding, the fold gains ~48px without the hero feeling
+     cramped. */
+  .hero { padding-block: var(--space-6); gap: var(--space-4); }
 }
 
 /* Kicker: entirely neutral. Its colour was subtracted — see HomePage.jsx. */
 .hero__kicker { color: var(--text-muted); }
+
+/* The section directly beneath the hero opens tighter than a standalone one.
+ *
+ * `--section-gap-tight` is right for a section arriving after a full band of
+ * content, but after the hero it stacked on top of the hero's own lower padding
+ * and the pair read as a blank strip rather than as a transition. Scoped to this
+ * one position rather than changed on `.section--tight`, which five other pages
+ * use in the ordinary way. */
+@media (min-width: 62rem) {
+  .section--after-hero { padding-block-start: var(--space-6); }
+}
 
 /* Centred, and measured so the sentence lands on two lines at desktop widths
    rather than three — a third line pushes the actions down and reads as filler
@@ -281,6 +297,8 @@
 .rail__mark--blue { background: var(--blue-600); }
 .rail__mark--ochre { background: var(--accent-ochre); }
 .rail__mark--olive { background: var(--accent-olive); }
+/* Completes the row without adding a fifth colour. */
+.rail__mark--neutral { background: var(--stone-deep); }
 
 /* The runner's track is its own layer with zero height, so the marker cannot
    affect layout no matter where it is in its travel. */
@@ -291,24 +309,31 @@
   height: var(--border-width);
   pointer-events: none;
 }
+/* Softened deliberately. It was a 40px bar of full-strength brand blue crossing
+   the rule every 11 seconds, which is a feature animation however small it looks
+   in a stylesheet. It is now half the width, at a third opacity, in stone rather
+   than blue, over a longer cycle with a longer rest — a registration mark drying
+   past, not something asking to be watched.
+
+   If it is still noticeable on screen, delete this rule and its keyframes. The
+   rail is designed to work as a static index and loses nothing without it. */
 .rail__runner {
   position: absolute;
   top: 0;
   left: 0;
-  width: 2.5rem;
+  width: 1.5rem;
   height: var(--border-width);
-  background: var(--blue-600);
-  /* 11s total: ~7s travelling, the remainder held still off-frame. The pause is
-     the point — a marker that never rests turns into a loading bar. */
-  animation: rail-runner 11s var(--ease) infinite;
+  background: var(--stone-deep);
+  /* 16s total: ~9s travelling, the rest held still off-frame. */
+  animation: rail-runner 16s linear infinite;
   transform: translateX(-100%);
 }
 @keyframes rail-runner {
-  0%   { transform: translateX(-2.5rem); opacity: 0; }
-  6%   { opacity: 1; }
-  58%  { transform: translateX(calc(100vw + 2.5rem)); opacity: 1; }
-  64%  { transform: translateX(calc(100vw + 2.5rem)); opacity: 0; }
-  100% { transform: translateX(calc(100vw + 2.5rem)); opacity: 0; }
+  0%   { transform: translateX(-1.5rem); opacity: 0; }
+  8%   { opacity: 0.35; }
+  56%  { transform: translateX(calc(100vw + 1.5rem)); opacity: 0.35; }
+  62%  { transform: translateX(calc(100vw + 1.5rem)); opacity: 0; }
+  100% { transform: translateX(calc(100vw + 1.5rem)); opacity: 0; }
 }
 /* Stops while the visitor is reading or navigating the top of the page. */
 .rail:hover .rail__runner,
