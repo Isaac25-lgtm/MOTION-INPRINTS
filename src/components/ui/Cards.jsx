@@ -51,6 +51,21 @@ export function ProjectCard({ project, ratio = 'landscape', sizes = '(min-width:
  * The descriptor is the category's real child services joined together. It is
  * never invented copy: if a category has no children, the line is simply absent.
  */
+/* Categories that are quoted rather than bought.
+ *
+ * Digital Solutions has no purchasable products and, being first in the
+ * taxonomy, is the first tile a visitor sees. Sending them to /shop/... would
+ * open an empty catalogue as the opening move of the site. These route to the
+ * services page instead, where the work is described and a quote can be started.
+ *
+ * Physical categories keep going to the shop. If real digital packages are ever
+ * published, remove the slug from this set and the tile routes to the shop like
+ * any other. */
+const QUOTE_FIRST_CATEGORIES = new Set(['digital-solutions', 'design'])
+
+export const categoryHref = (slug) =>
+  QUOTE_FIRST_CATEGORIES.has(slug) ? `/services/${slug}` : `/shop/${slug}`
+
 export function CategoryTile({ category, services = [], ratio = 'landscape' }) {
   const descriptor = services.map(service => service.name).join(' · ')
   /* A real image from the database, else a licensed illustrative photograph
@@ -60,7 +75,7 @@ export function CategoryTile({ category, services = [], ratio = 'landscape' }) {
   const image = resolveCategoryImage(category)
   return (
     <Link
-      to={`/shop/${category.slug}`}
+      to={categoryHref(category.slug)}
       className="category-card"
       aria-label={descriptor ? `${category.name}: ${descriptor}` : category.name}
     >

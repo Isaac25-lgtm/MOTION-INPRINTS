@@ -137,7 +137,16 @@ export const quoteResponseSchema = z.object({
 /* Project intake (Prompt 6.1). Answers vary by project type, so they are validated
    as a bounded document rather than a fixed set of columns. */
 export const projectIntakeSchema = z.object({
-  projectType: z.enum(['signage', 'printing', 'branding', 'apparel', 'promotional', 'decor', 'website', 'ecommerce', 'pos', 'other']),
+  /* Digital-first ordering, and two additions the taxonomy now offers.
+     'pos' is retained: it was accepted before, saved quote requests may carry it,
+     and dropping a value that already exists in the database would turn old rows
+     into validation failures. New submissions use 'business_systems'. */
+  projectType: z.enum([
+    'website', 'ecommerce', 'digital_marketing', 'business_systems',
+    'signage', 'printing', 'branding', 'apparel', 'promotional', 'decor',
+    'pos',
+    'other',
+  ]),
   contactName: z.string().trim().min(2).max(120),
   contactEmail: z.string().trim().email().max(254),
   contactPhone: z.string().trim().max(40).optional(),

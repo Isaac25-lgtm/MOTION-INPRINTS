@@ -25,6 +25,7 @@ import {
 } from './pages/admin/AdminPages'
 import { adminService } from './services/adminService'
 import { ManagerSignInPage } from './pages/ManagerSignInPage'
+import { ManagerActivatePage } from './pages/ManagerActivatePage'
 import { TrackOrderPage } from './pages/TrackOrderPage'
 import { SignInPage, SignUpPage, ResetPasswordPage } from './pages/AuthPages'
 import { AdminContentPage, AdminFilesPage, AdminSettingsPage } from './pages/admin/AdminManagePages'
@@ -108,10 +109,19 @@ export function App() {
         <Route path="/account/profile" element={<AccountProfilePage />} />
       </Route>
 
+      {/* Migration 0013 renamed the point-of-sale slug to business-systems.
+          Existing bookmarks and any shared links must not become 404s. */}
+      <Route path="/services/business-point-of-sale-systems" element={<Navigate to="/services/business-systems" replace />} />
+      <Route path="/shop/business-point-of-sale-systems" element={<Navigate to="/shop/business-systems" replace />} />
+
       {/* Staff sign-in. Public by necessity — someone has to be able to reach it
           before they have a session — and unlinked by design. Obscurity is not
           the protection; every management API verifies session and role. */}
       <Route path="/manager" element={<ManagerSignInPage />} />
+      {/* Unlinked from anywhere public. Creates an ordinary email/password
+          account and grants nothing — authorisation happens server-side at
+          sign-in, and this page cannot tell whether an address is approved. */}
+      <Route path="/manager/activate" element={<ManagerActivatePage />} />
 
       {/* Compatibility only, for links that predate /manager. */}
       <Route path="/admin" element={<Navigate to="/manager/dashboard" replace />} />

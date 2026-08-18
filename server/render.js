@@ -1,5 +1,12 @@
-#!/usr/bin/env node
 /* Node HTTP bridge for the Fetch-style API handler.
+ *
+ * NO SHEBANG, deliberately. This module is imported by tests, and the test
+ * runner's bundler cannot strip a `#!` line that ends in CRLF — which produced a
+ * bare "Invalid or unexpected token" pointing at whichever test file imported the
+ * bridge, rather than at the bridge itself. It brought down the whole suite on a
+ * clean checkout. Nothing needs the shebang: the process is started by
+ * `npm run start:api`, which invokes `node server/render.js` explicitly, never by
+ * executing the file directly.
  *
  * `server/index.js` exports a handler of the shape `(Request) => Response`,
  * which is what a fetch-native runtime wants and what the tests exercise
@@ -16,11 +23,19 @@
  * Nothing here logs a header, a body, a query string or a connection string.
  * The Authorization header and DATABASE_URL both pass through this file, and a
  * request log that seemed harmless is the usual way either ends up on disk.
+ *
+ * `server/index.js` is imported ONLY when this file is the process entry point.
+ * It builds a database client and a JWKS fetcher from `serverConfig()` at module
+ * scope, so importing it here unconditionally made merely importing the bridge
+ * require DATABASE_URL, NEON_AUTH_JWKS_URL and NEON_AUTH_ISSUER — which crashed
+ * the whole test suite on a machine with no environment configured, before the
+ * bridge's own tests could run. The bridge translates Node to Fetch and knows
+ * nothing about the API it serves; that is exactly why it can be tested with a
+ * stub, and why it must not drag production configuration in behind it.
  */
 
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
-import handler from './index.js'
 
 const PORT = Number(process.env.PORT) || 8787
 /* Render routes to the container's published port on all interfaces; binding
@@ -105,7 +120,7 @@ const json = (nodeResponse, status, payload) => {
   nodeResponse.end(body)
 }
 
-export function createRenderServer(apiHandler = handler) {
+export function createRenderServer(apiHandler) {
   return createServer(async (nodeRequest, nodeResponse) => {
     try {
       /* Health check, answered before the handler so it needs no database, no
@@ -138,14 +153,39 @@ export function createRenderServer(apiHandler = handler) {
    bind an ephemeral port without this module seizing PORT as a side effect. */
 const isEntryPoint = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
 if (isEntryPoint) {
-  const server = createRenderServer()
-  server.listen(PORT, HOST, () => {
-    // Port and host only. Never the database, the auth issuer or any variable.
-    console.log(`Motion API listening on ${HOST}:${PORT}`)
-  })
-  for (const signal of ['SIGTERM', 'SIGINT']) {
-    process.on(signal, () => { server.close(() => process.exit(0)) })
-  }
+  /* Loaded here and nowhere else. `npm run start:api` therefore still requires
+     full production configuration and fails loudly without it, while importing
+     this module for a test requires nothing at all.
+   *
+   * Deliberately a promise chain rather than top-level `await`. Top-level await
+   * is valid ESM and Node accepts it, but it made this module untransformable by
+   * the test runner's bundler — which took down every test file that imports the
+   * bridge, with a bare "Invalid or unexpected token" pointing at the test rather
+   * than at the cause. A `.then()` costs nothing and works everywhere. */
+  import('./index.js')
+    .then(({ default: productionHandler }) => {
+      const server = createRenderServer(productionHandler)
+      server.listen(PORT, HOST, () => {
+        // Port and host only. Never the database, the auth issuer or any variable.
+        console.log(`Motion API listening on ${HOST}:${PORT}`)
+      })
+      for (const signal of ['SIGTERM', 'SIGINT']) {
+        process.on(signal, () => { server.close(() => process.exit(0)) })
+      }
+    })
+    .catch((error) => {
+      /* Configuration failures must be visible and fatal, but an error message is
+         not a safe thing to print unedited: a driver or URL-parsing failure can
+         carry the connection string, and this is the one place in the process
+         that writes to a log a platform will retain. Anything resembling a
+         credential is replaced before printing. Our own startup errors name
+         missing variables and nothing else, so they survive intact. */
+      const safe = String(error?.message || 'startup failed')
+        .replace(/[a-z+]+:\/\/[^\s]*@[^\s]*/gi, '<redacted-url>')
+        .replace(/(password|secret|token|key)\s*[=:]\s*\S+/gi, '$1=<redacted>')
+      console.error(`Motion API failed to start: ${safe}`)
+      process.exit(1)
+    })
 }
 
 export default createRenderServer

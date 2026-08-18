@@ -50,6 +50,7 @@ const api = createApi({
   authenticate: createAuthenticator({ jwksUrl: config.authJwksUrl, issuer: config.authIssuer, db }),
   // Server-only allowlist. Never reaches the browser.
   ownerAllowedEmails: config.ownerAllowedEmails,
+  ownersConfigured: config.ownersConfigured,
 })
 const apiHandler = createHttpHandler(api, config, { getClientKey: createClientKeyResolver(config) })
 

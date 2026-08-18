@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Form'
 import { LoadingState } from '../components/LoadingState'
@@ -120,11 +120,16 @@ export function ManagerSignInPage() {
               <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
             </form>
 
-            {/* An approved owner who has only ever used Google can set a password
-                here. It is the ordinary reset flow: the link is emailed to the
-                address itself, so it proves control rather than granting it. */}
+            {/* Two distinct paths, because they solve different problems.
+                "Set up" creates a password account for someone who has only ever
+                used Google — the reset flow acts on an existing password
+                credential and is not documented to mint one, so pointing there
+                would have promised behaviour I had not verified. "Forgotten"
+                is the reset flow, which is well-defined once a password exists. */}
             <p className="t-body-sm t-muted">
-              <a className="link" href="/reset-password">Set or reset your staff password</a>
+              <Link className="link" to="/manager/activate">Set up email and password access</Link>
+              {' · '}
+              <Link className="link" to="/reset-password">Forgotten your password?</Link>
             </p>
           </>
         )}

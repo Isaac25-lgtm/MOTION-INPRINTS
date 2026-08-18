@@ -205,7 +205,8 @@ describe('public pages render', () => {
 
   it('renders services, work, about, contact and custom project', async () => {
     const services = await render(() => import('../src/pages/ServicesPage.jsx'), 'ServicesPage')
-    expect(services).toContain('What Motion produces')
+    // Digital leads the Services heading, as it leads the taxonomy.
+    expect(services).toContain('Digital, design, print and brand')
 
     const work = await render(() => import('../src/pages/WorkPage.jsx'), 'WorkPage')
     expect(work).toContain('Selected work')

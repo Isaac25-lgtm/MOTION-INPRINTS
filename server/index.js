@@ -14,5 +14,6 @@ const api = createApi({
   authenticate: createAuthenticator({ jwksUrl: config.authJwksUrl, issuer: config.authIssuer, db }),
   // Server-only allowlist. Never reaches the browser.
   ownerAllowedEmails: config.ownerAllowedEmails,
+  ownersConfigured: config.ownersConfigured,
 })
 export default createHttpHandler(api, config, { getClientKey: createClientKeyResolver(config) })

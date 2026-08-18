@@ -222,3 +222,114 @@ describe('digital-first ordering', () => {
     expect(rendered).not.toMatch(/UGX\s*[\d,]|from UGX|starting at|per month|package/i)
   })
 })
+
+describe('digital request types are usable by guests', () => {
+  const submit = (projectType, extra = {}) => {
+    const api = createApi({ db: commerceDb(), authenticate: anonymous, logger: silent })
+    return api(post('/api/quote-requests', {
+      projectType,
+      contactName: 'Amina Nakato',
+      contactEmail: 'amina@example.com',
+      projectBrief: 'A clear description of what the business needs building.',
+      answers: extra,
+    }))
+  }
+
+  it('accepts a digital marketing request with no session', async () => {
+    const result = await read(await submit('digital_marketing', { audience: 'Retail customers in Kampala', channels: 'Instagram' }))
+    expect(result.status, 'guests must be able to request digital marketing').not.toBe(401)
+    expect(result.status).not.toBe(403)
+    expect(result.status).not.toBe(422)
+  })
+
+  it('accepts a business systems request with no session', async () => {
+    const result = await read(await submit('business_systems', { systemNeed: 'Stock across two branches' }))
+    expect(result.status).not.toBe(401)
+    expect(result.status).not.toBe(403)
+    expect(result.status).not.toBe(422)
+  })
+
+  /* Saved rows may already carry the retired value; dropping it from the enum
+     would turn existing data into validation failures. */
+  it('still accepts the legacy pos value', async () => {
+    const result = await read(await submit('pos'))
+    expect(result.status).not.toBe(422)
+  })
+
+  it('rejects a project type that does not exist', async () => {
+    const result = await read(await submit('teleportation'))
+    expect(result.status).toBe(422)
+  })
+
+  it('offers both new types in the public form, and no longer names POS as the whole offering', async () => {
+    const form = await readFile(fileURLToPath(new URL('../src/pages/CustomProjectPage.jsx', import.meta.url)), 'utf8')
+    expect(form).toContain("value: 'digital_marketing'")
+    expect(form).toContain("value: 'business_systems'")
+    expect(form).toContain("label: 'Business systems'")
+    expect(form, 'POS must not be the label').not.toContain("label: 'POS / business system'")
+    // Digital options come first in the list.
+    const order = [...form.matchAll(/\{ value: '(\w+)', label:/g)].map(m => m[1])
+    expect(order.slice(0, 4)).toEqual(['website', 'ecommerce', 'digital_marketing', 'business_systems'])
+  })
+})
+
+describe('quote-first categories do not lead to an empty shop', () => {
+  it('routes Digital Solutions to services and physical categories to the shop', async () => {
+    const cards = await readFile(fileURLToPath(new URL('../src/components/ui/Cards.jsx', import.meta.url)), 'utf8')
+    const body = cards.slice(cards.indexOf('const QUOTE_FIRST_CATEGORIES'), cards.indexOf('export function CategoryTile'))
+    // `export` is not valid inside a Function body; the declaration alone is.
+    const href = new Function(`${body.replace(/export /g, '')} return categoryHref`)()
+
+    expect(href('digital-solutions')).toBe('/services/digital-solutions')
+    expect(href('design')).toBe('/services/design')
+    // Everything purchasable still goes to the catalogue.
+    for (const slug of ['printing', 'signage', 'apparel', 'promotional-display', 'decor']) {
+      expect(href(slug)).toBe(`/shop/${slug}`)
+    }
+  })
+
+  it('uses that helper for the tile rather than a hardcoded shop link', async () => {
+    const cards = await readFile(fileURLToPath(new URL('../src/components/ui/Cards.jsx', import.meta.url)), 'utf8')
+    const tile = cards.slice(cards.indexOf('export function CategoryTile'), cards.indexOf('export function Badge'))
+    expect(tile).toContain('categoryHref(category.slug)')
+    expect(tile).not.toMatch(/to=\{`\/shop\/\$\{category\.slug\}`\}/)
+  })
+})
+
+describe('legacy links keep working', () => {
+  it('redirects the retired point-of-sale slugs', async () => {
+    const app = await readFile(fileURLToPath(new URL('../src/App.jsx', import.meta.url)), 'utf8')
+    for (const from of ['/services/business-point-of-sale-systems', '/shop/business-point-of-sale-systems']) {
+      const line = app.split('\n').find(l => l.includes(`path="${from}"`))
+      expect(line, `${from} must not 404`).toBeTruthy()
+      expect(line).toContain('Navigate')
+      expect(line).toContain('business-systems')
+    }
+  })
+})
+
+describe('digital-first copy across public pages', () => {
+  const page = (file) => readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
+
+  it('leads with digital on Services, About and the footer', async () => {
+    const services = await page('../src/pages/ServicesPage.jsx')
+    expect(services).toContain('Digital, design, print and brand')
+    expect(services).toMatch(/Websites, e-commerce, digital marketing and business systems/)
+
+    const about = await page('../src/pages/AboutPage.jsx')
+    expect(about).toContain('A digital and production studio in Kampala')
+    // Digital is the first capability listed.
+    const first = about.match(/\{ title: '([^']+)'/)[1]
+    expect(first).toBe('Digital solutions')
+
+    const footer = await page('../src/layouts/SiteFooter.jsx')
+    expect(footer).toMatch(/Digital, design, print and brand production in Kampala/)
+  })
+
+  it('makes no unsupported claim of leadership or scale', async () => {
+    for (const file of ['../src/pages/ServicesPage.jsx', '../src/pages/AboutPage.jsx', '../src/pages/HomePage.jsx', '../src/layouts/SiteFooter.jsx']) {
+      const source = (await page(file)).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+      expect(source, `${file} must not claim leadership`).not.toMatch(/\b(pioneer|leading|market leader|number one|best in|award-winning|world-class)\b/i)
+    }
+  })
+})

@@ -95,7 +95,17 @@ No Google client secret exists in this repository, and none should.
 
 | Variable | Exposure | Value |
 | --- | --- | --- |
-| `OWNER_ALLOWED_EMAILS` | **Server-only, `motion-api` only** | Comma-separated addresses of the two owners |
+| `OWNER_ALLOWED_EMAILS` | **Server-only, `motion-api` only** | Exactly two comma-separated owner addresses |
+
+### The one manual Render step
+
+**Set `OWNER_ALLOWED_EMAILS` on the `motion-api` service, with the two real owner addresses, before anyone tries to sign in at `/manager`.** It is declared `sync: false`, so a Blueprint sync prompts for it.
+
+Format: `first@example.com,second@example.com` — a placeholder here, never the real values in any document or commit.
+
+It must be **exactly two distinct, well-formed addresses**. Missing, blank, one, three, duplicated or malformed all resolve to an empty list, which approves nobody. A half-configured allowlist must never mean "approve whoever is left".
+
+**A missing or broken value never breaks the public site.** It does not throw and does not stop the API: customers browse, configure, order, request quotes and track normally. Only `POST /api/staff/bootstrap` reports it, as a neutral `503 staff_configuration_unavailable` that names no address and confirms nothing about who is approved.
 
 Never give it a `VITE_` name and never add it to the static site — everything there ships to the browser. A test walks `src/` and fails if the name appears anywhere in frontend source.
 

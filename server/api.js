@@ -42,7 +42,7 @@ const withMediaUrl = (baseUrl) => (row) => {
   return { ...rest, image: key && baseUrl ? `${baseUrl.replace(/\/$/, '')}/${key}` : null }
 }
 
-export function createApi({ db, authenticate = async () => null, logger = console, storage, mediaBaseUrl = null, ownerAllowedEmails = [] }) {
+export function createApi({ db, authenticate = async () => null, logger = console, storage, mediaBaseUrl = null, ownerAllowedEmails = [], ownersConfigured = undefined }) {
   const decorate = withMediaUrl(mediaBaseUrl)
   return async function api(request) {
     const started = Date.now(); const url = new URL(request.url); const parts = routes(url.pathname)
@@ -73,7 +73,7 @@ export function createApi({ db, authenticate = async () => null, logger = consol
          identity is on the server-side allowlist, and refuses neutrally otherwise.
          Placed before /me so it is never mistaken for customer onboarding. */
       else if (request.method === 'POST' && parts[0] === 'staff' && parts[1] === 'bootstrap') {
-        response = json(await staffBootstrap(request, db, authenticate, ownerAllowedEmails), 200)
+        response = json(await staffBootstrap(request, db, authenticate, { ownerAllowedEmails, ownersConfigured }), 200)
       }
       else if (request.method === 'GET' && parts[0] === 'me') { const actor = await requireCustomer(request, authenticate); response = ok(actor.profile) }
       else if (request.method === 'POST' && parts[0] === 'me') { const actor = await requireAuth(request, authenticate); const body = validate(profileSchema, await readJson(request)); if (actor.profile) throw new ApiError(409, 'profile_exists', 'A profile already exists.'); const rows = await db.query('INSERT INTO public.user_profiles(auth_user_id,role,full_name,phone,company_name) VALUES($1,$2,$3,$4,$5) RETURNING id,auth_user_id,role,full_name,phone,company_name', [actor.authUserId,'customer',body.fullName,body.phone || null,body.companyName || null]); response = ok(rows[0], 201) }

@@ -46,8 +46,17 @@ async function recordAudit(db, { authUserId, profileId, action, summary }) {
  * Returns `{ data: { owner: true, profile } }` for an approved identity, or a
  * 403 with a neutral message for anyone else.
  */
-export async function staffBootstrap(request, db, authenticate, ownerAllowedEmails = []) {
+export async function staffBootstrap(request, db, authenticate, options = {}) {
+  const { ownerAllowedEmails = [], ownersConfigured = ownerAllowedEmails.length > 0 } = options
   const actor = await requireAuth(request, authenticate)
+
+  /* Distinct from a refusal, because the causes are different and so are the
+     fixes: this one is the operator's to solve, not the caller's. It still says
+     nothing about who is approved, and it is reported ONLY here — the public API
+     keeps serving customers regardless of staff configuration. */
+  if (!ownersConfigured) {
+    throw new ApiError(503, 'staff_configuration_unavailable', 'Staff access is not available on this installation.')
+  }
 
   const identity = await resolveVerifiedIdentity(db, actor.authUserId)
   const approved = identity && isApprovedOwnerEmail(identity.email, ownerAllowedEmails)

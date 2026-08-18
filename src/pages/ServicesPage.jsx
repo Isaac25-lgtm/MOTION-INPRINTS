@@ -40,10 +40,10 @@ export function ServicesPage() {
     <div className="container">
       <div className="page-head">
         <Breadcrumbs trail={[{ label: 'Services' }]} />
-        <h1 className="t-h1 page-head__title">What Motion produces</h1>
+        <h1 className="t-h1 page-head__title">Digital, design, print and brand</h1>
         <p className="t-body-lg t-muted t-measure">
-          Printing, signage, promotional display, apparel and décor, alongside graphic
-          design and the digital systems that carry a brand online.
+          Websites, e-commerce, digital marketing and business systems—alongside
+          signage, commercial print and branded products.
         </p>
       </div>
 

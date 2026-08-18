@@ -216,3 +216,160 @@ describe('owner allowlist configuration', () => {
     }
   })
 })
+
+describe('exactly two owners, or nobody', () => {
+  const base = {
+    DATABASE_URL: 'postgres://u:p@localhost:5432/db',
+    NEON_AUTH_JWKS_URL: 'https://ep-test.neonauth.example.aws.neon.tech/neondb/auth/.well-known/jwks.json',
+    NEON_AUTH_ISSUER: 'https://ep-test.neonauth.example.aws.neon.tech',
+  }
+  const config = (value) => serverConfig({ ...base, ...(value === undefined ? {} : { OWNER_ALLOWED_EMAILS: value }) })
+
+  it('accepts exactly two well-formed addresses, normalised', () => {
+    const c = config(' Owner-One@Example.com , owner-two@example.com ')
+    expect(c.ownersConfigured).toBe(true)
+    expect(c.ownerAllowedEmails).toEqual(['owner-one@example.com', 'owner-two@example.com'])
+  })
+
+  /* Every malformed shape resolves to an EMPTY list. A half-configured allowlist
+     must never mean "approve whoever is left".
+
+     Validation runs on the RAW supplied list, before any deduplication. Doing it
+     the other way round was a real hole: three entries containing two unique
+     addresses collapsed to two and were accepted, so a list that plainly did not
+     name two owners passed silently. */
+  it('approves nobody when the list is not exactly two valid addresses', () => {
+    for (const value of [
+      undefined,                                    // unset
+      '',                                           // blank
+      'owner-one@example.com',                      // only one
+      'a@x.com,b@y.com,c@z.com',                    // three distinct
+      'owner-one@example.com,not-an-email',         // malformed
+      'owner-one@example.com,@example.com',         // malformed
+    ]) {
+      const c = config(value)
+      expect(c.ownersConfigured, `"${value}" must not count as configured`).toBe(false)
+      expect(c.ownerAllowedEmails).toEqual([])
+    }
+  })
+
+  /* Duplicates specifically, because deduplicating before counting is the exact
+     mistake that let a three-entry list through. */
+  it('refuses any duplicate, however it is written', () => {
+    const duplicates = {
+      'the same address twice': 'owner1@email.com,owner1@email.com',
+      'the same twice plus a second': 'owner1@email.com,owner1@email.com,owner2@email.com',
+      'the same in different case': 'Owner1@Email.com,owner1@email.com',
+      'the same with surrounding whitespace': ' owner1@email.com , owner1@email.com ',
+      'the same in case and spacing, plus a second': ' Owner1@Email.com ,owner1@email.com, owner2@email.com',
+    }
+    for (const [description, value] of Object.entries(duplicates)) {
+      const c = config(value)
+      expect(c.ownersConfigured, `${description} must not be configured`).toBe(false)
+      expect(c.ownerAllowedEmails, `${description} must approve nobody`).toEqual([])
+    }
+  })
+
+  it('accepts exactly two distinct valid addresses and nothing else', () => {
+    const c = config('owner1@email.com,owner2@email.com')
+    expect(c.ownersConfigured).toBe(true)
+    expect(c.ownerAllowedEmails).toEqual(['owner1@email.com', 'owner2@email.com'])
+  })
+
+  /* A stray comma is a typo, not a third owner. Blanks are dropped before the
+     count, so two real addresses still configure — failing closed here would
+     lock both owners out over a punctuation slip. */
+  it('tolerates an empty entry from a stray comma', () => {
+    for (const value of ['a@x.com,,b@y.com', 'a@x.com,b@y.com,', ',a@x.com,b@y.com']) {
+      const c = config(value)
+      expect(c.ownersConfigured, `"${value}" is still two owners`).toBe(true)
+      expect(c.ownerAllowedEmails).toEqual(['a@x.com', 'b@y.com'])
+    }
+  })
+
+  /* Staff configuration is not a reason to stop a customer buying. */
+  it('never throws, so the public API keeps serving guests', () => {
+    expect(() => config('nonsense')).not.toThrow()
+    expect(() => config(undefined)).not.toThrow()
+    const api = createApi({ db: fakeDb(), authenticate: async () => null, logger: silent, ownerAllowedEmails: [], ownersConfigured: false })
+    return expect(api(req('/api/products'))).resolves.toMatchObject({ status: 200 })
+  })
+
+  it('reports the problem only on the staff route, and only neutrally', async () => {
+    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: true } })
+    const api = createApi({ db, authenticate: authAs('u1'), logger: silent, ownerAllowedEmails: [], ownersConfigured: false })
+    const result = await body(await api(req('/api/staff/bootstrap', { method: 'POST' })))
+
+    expect(result.status).toBe(503)
+    expect(result.error.code).toBe('staff_configuration_unavailable')
+    // Says nothing about which addresses are approved, or that any exist.
+    expect(result.error.message).not.toMatch(/owner|allow|email|@/i)
+    expect(insertsIn(db)).toHaveLength(0)
+  })
+})
+
+describe('staff password activation', () => {
+  const page = async () => {
+    const { readFile } = await import('node:fs/promises')
+    const { fileURLToPath } = await import('node:url')
+    return readFile(fileURLToPath(new URL('../src/pages/ManagerActivatePage.jsx', import.meta.url)), 'utf8')
+  }
+
+  /* Comments are stripped: the file explains at length that it grants nothing,
+     and matching the word "approved" inside that explanation is not a finding.
+     `role="alert"` is an ARIA attribute, not a role being submitted. */
+  const code = async () => (await page())
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/role="[a-z]+"/g, '')
+
+  it('creates an ordinary account and never sends a role or an owner flag', async () => {
+    const source = await code()
+    expect(source).toContain('authClient.signUp')
+
+    // The only payload it builds is the sign-up one.
+    const start = source.indexOf('authClient.signUp')
+    const call = source.slice(start, source.indexOf(')', source.indexOf('})', start)) + 1)
+    expect(call).toContain('email')
+    expect(call).toContain('password')
+    for (const forbidden of ['role', 'isOwner', 'owner', 'staff', 'admin']) {
+      expect(call, `the sign-up payload must not carry ${forbidden}`).not.toMatch(new RegExp(`\b${forbidden}\b`, 'i'))
+    }
+    // It never calls the grant endpoint.
+    expect(source).not.toContain('staffService')
+  })
+
+  it('cannot reveal whether an address is approved', async () => {
+    const source = await code()
+    // The allowlist never reaches the browser, so the page has nothing to leak.
+    expect(source).not.toContain('OWNER_ALLOWED_EMAILS')
+    expect(source).not.toMatch(/(approved|allowlist|not authorised)/i)
+  })
+
+  it('directs the user to verify and then sign in, rather than implying access', async () => {
+    const source = await page()
+    expect(source).toMatch(/confirmation link/i)
+    expect(source).toMatch(/not granted by creating the account/i)
+    expect(source).toContain('/manager')
+  })
+
+  it('is routed but never linked from anywhere public', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const { fileURLToPath } = await import('node:url')
+    const app = await readFile(fileURLToPath(new URL('../src/App.jsx', import.meta.url)), 'utf8')
+    expect(app).toContain('path="/manager/activate"')
+
+    for (const file of ['../src/layouts/SiteHeader.jsx', '../src/layouts/SiteFooter.jsx', '../src/pages/account/AccountPages.jsx']) {
+      const source = await readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
+      expect(source, `${file} must not link staff activation`).not.toMatch(/manager\/activate/)
+    }
+  })
+
+  /* Only the server may grant the role, wherever the account came from. */
+  it('leaves the bootstrap as the sole grant path for an activated account', async () => {
+    const db = fakeDb({ identity: { id: 'new-user', email: 'stranger@example.com', email_verified: true } })
+    const result = await body(await bootstrap(db, authAs('new-user')))
+    expect(result.status).toBe(403)
+    expect(insertsIn(db)).toHaveLength(0)
+  })
+})

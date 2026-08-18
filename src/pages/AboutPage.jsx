@@ -11,13 +11,16 @@ import { useSiteContent } from '../content/SiteContentProvider'
    Nothing here states a founding year, client count, project count, award,
    staff size or company history, because none of that has been verified. */
 
+/* Ordered as the taxonomy is: digital first. Descriptive only — no claim about
+   facilities, capacity or scale, which are the owner's to make through the CMS. */
 const capabilities = [
+  { title: 'Digital solutions', note: 'Websites, e-commerce stores, digital marketing and business systems — scoped and quoted per project.' },
   { title: 'Printing', note: 'Digital, UV, sublimation and offset printing for commercial and promotional work.' },
   { title: 'Signage', note: '2D and 3D signage, lightboxes, pylons and acrylic signs — fabricated and installed.' },
   { title: 'Promotional & display', note: 'Pull-up banners, teardrops, stickers and promotional items.' },
   { title: 'Branded apparel', note: 'T-shirts, caps and bucket hats branded by print or embroidery.' },
   { title: 'Wall décor', note: 'Canvas, glass and acrylic wall pieces, finished and mounted.' },
-  { title: 'Design & digital', note: 'Graphic design, websites, e-commerce stores and point-of-sale systems.' },
+  { title: 'Graphic design', note: 'Identity, layout and artwork prepared for production.' },
 ]
 
 export function AboutPage() {
@@ -31,9 +34,9 @@ export function AboutPage() {
     <div className="container">
       <div className="page-head">
         <Breadcrumbs trail={[{ label: 'About' }]} />
-        <h1 className="t-h1 page-head__title">A production studio in Kampala</h1>
+        <h1 className="t-h1 page-head__title">A digital and production studio in Kampala</h1>
         <p className="t-body-lg t-muted t-measure">
-          {intro || 'Motion designs, prints and brands. We produce the physical materials a business is recognised by — and increasingly, the digital systems it runs on.'}
+          {intro || 'Motion builds the digital side of a brand and produces the physical materials it is recognised by — websites, e-commerce, digital marketing and business systems, alongside signage, commercial print and branded products.'}
         </p>
       </div>
 
@@ -77,7 +80,7 @@ export function AboutPage() {
         <div className="section-head">
           <div className="section-head__text">
             <p className="t-eyebrow">Capabilities</p>
-            <h2 className="t-h2" id="capabilities">What we produce</h2>
+            <h2 className="t-h2" id="capabilities">What we build and produce</h2>
           </div>
           <Button to="/services" variant="text" arrow>All services</Button>
         </div>

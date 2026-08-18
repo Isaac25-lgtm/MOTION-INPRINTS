@@ -116,13 +116,23 @@ describe('Render Node bridge', () => {
     const source = await readFile(fileURLToPath(new URL('../server/render.js', import.meta.url)), 'utf8')
     const logs = source.match(/console\.(log|info|warn|error|debug)\([^)]*\)/g) || []
 
-    // Exactly one log line: the listening notice.
-    expect(logs).toHaveLength(1)
-    expect(logs[0]).toContain('listening')
+    /* Two log lines only: the listening notice, and a startup failure. Nothing
+       per-request is ever logged here. */
+    expect(logs).toHaveLength(2)
+    expect(logs.some(l => l.includes('listening'))).toBe(true)
+    expect(logs.some(l => l.includes('failed to start'))).toBe(true)
 
-    for (const forbidden of ['headers', 'authorization', 'body', 'DATABASE_URL', 'process.env.DATABASE_URL', 'req.url', 'nodeRequest.url']) {
-      expect(logs[0], `startup logging must not include ${forbidden}`).not.toContain(forbidden)
+    for (const line of logs) {
+      for (const forbidden of ['headers', 'authorization', 'body', 'DATABASE_URL', 'process.env', 'req.url', 'nodeRequest.url']) {
+        expect(line, `logging must not include ${forbidden}`).not.toContain(forbidden)
+      }
     }
+
+    /* The failure line prints an error message, which is not inherently safe —
+       a driver failure can carry a connection string. It must be redacted. */
+    const failureLine = logs.find(l => l.includes('failed to start'))
+    expect(failureLine).toContain('safe')
+    expect(source).toMatch(/redacted-url/)
     // And no framework was smuggled in to do the job.
     expect(source).not.toMatch(/from 'express'|require\('express'\)/)
   })

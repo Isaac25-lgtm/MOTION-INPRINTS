@@ -56,24 +56,42 @@ export function serverConfig(source = process.env) {
   }
   const trustedClientHeader = declared === 'none' ? null : declared
 
-  /* The two people allowed into the management dashboard, by email address.
+  /* Exactly two addresses, or nobody is approved.
    *
-   * Server-only. It must never be given a VITE_ name and never reach the
-   * browser: the frontend has no use for it, and publishing the owners' email
-   * addresses invites targeted phishing against the only accounts that matter.
+   * Validated on the RAW normalised list, deliberately BEFORE any
+   * deduplication. Collapsing duplicates first was a real hole:
    *
-   * An address here is not a credential and grants nothing on its own. It is one
-   * half of a check whose other half is a cryptographically verified Neon Auth
-   * session — see resolveVerifiedIdentity() in server/auth.js. Someone who knows
-   * an owner's email still has to prove control of it through Neon Auth.
+   *     owner1@x.com,owner1@x.com,owner2@x.com
    *
-   * Empty is a valid, safe state: no identity is approved, so nobody can be
-   * elevated. It fails closed rather than open.
+   * became two unique addresses and was accepted, so a list that plainly does
+   * not name two owners silently passed. Someone editing the variable in a
+   * hurry, or pasting a line twice, would have got a working configuration
+   * that did not say what they thought it said.
+   *
+   * The order is now: split, normalise, drop blanks, then require exactly two
+   * SUPPLIED entries, both well-formed, and distinct from each other. Any
+   * failure resolves to EMPTY, which approves nobody — a half-configured
+   * allowlist must never mean "approve whoever is left".
+   *
+   * It deliberately does NOT throw. Staff configuration is not a reason to stop
+   * a customer buying: the public API, checkout, quotes and tracking all work
+   * regardless, and only the staff bootstrap route reports the problem, as a
+   * neutral refusal that names nothing.
    */
-  const ownerAllowedEmails = (source.OWNER_ALLOWED_EMAILS || '')
+  const suppliedOwners = (source.OWNER_ALLOWED_EMAILS || '')
     .split(',')
     .map(value => value.trim().toLowerCase())
     .filter(Boolean)
+
+  const EMAIL = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/
+  const ownersConfigured =
+    suppliedOwners.length === 2 &&
+    suppliedOwners.every(value => EMAIL.test(value)) &&
+    // Distinct after normalising, so the same address in two cases is caught.
+    new Set(suppliedOwners).size === 2
+
+  const ownerAllowedEmails = ownersConfigured ? suppliedOwners : []
+
   return Object.freeze({
     databaseUrl: source.DATABASE_URL,
     authJwksUrl: source.NEON_AUTH_JWKS_URL,
@@ -82,6 +100,9 @@ export function serverConfig(source = process.env) {
     timeoutMs: Number(source.API_REQUEST_TIMEOUT_MS || 10000),
     trustedClientHeader: trustedClientHeader || null,
     ownerAllowedEmails,
+    // Lets the staff route distinguish 'not approved' from 'not configured'
+    // without revealing either to the caller.
+    ownersConfigured,
     rateLimit: { windowMs: Number(source.API_RATE_LIMIT_WINDOW_MS || 60000), max: Number(source.API_RATE_LIMIT_MAX_REQUESTS || 100), maxKeys: Number(source.API_RATE_LIMIT_MAX_KEYS || 10000) },
     storage: { endpoint: source.OBJECT_STORAGE_ENDPOINT, bucket: source.OBJECT_STORAGE_BUCKET, publicBaseUrl: source.OBJECT_STORAGE_PUBLIC_BASE_URL },
   })

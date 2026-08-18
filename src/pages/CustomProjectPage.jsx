@@ -14,15 +14,19 @@ import { fileService } from '../services/fileService'
    enquiry is never asked for signage dimensions and a signage enquiry is never
    asked about existing web hosting (Prompt 6.1). */
 const projectTypes = [
+  /* Digital first, matching the taxonomy. 'Business systems' replaces
+     'POS / business system': point of sale is one system Motion can build, and
+     naming only that was positioning the business out of everything else. */
+  { value: 'website', label: 'Website', extras: ['businessType', 'features', 'existingSite', 'references'] },
+  { value: 'ecommerce', label: 'E-commerce website', extras: ['businessType', 'features', 'existingSite', 'references'] },
+  { value: 'digital_marketing', label: 'Digital marketing', extras: ['businessType', 'audience', 'channels', 'references'] },
+  { value: 'business_systems', label: 'Business systems', extras: ['businessType', 'systemNeed', 'features', 'references'] },
   { value: 'signage', label: 'Signage', extras: ['dimensions', 'placement', 'installation', 'artwork'] },
   { value: 'branding', label: 'Branding', extras: ['artwork'] },
   { value: 'printing', label: 'Printing', extras: ['quantity', 'dimensions', 'artwork'] },
   { value: 'apparel', label: 'Apparel', extras: ['quantity', 'sizes', 'artwork'] },
   { value: 'promotional', label: 'Promotional / display', extras: ['quantity', 'deadline', 'artwork'] },
   { value: 'decor', label: 'Wall décor', extras: ['dimensions', 'installation', 'artwork'] },
-  { value: 'website', label: 'Website', extras: ['businessType', 'features', 'existingSite', 'references'] },
-  { value: 'ecommerce', label: 'E-commerce website', extras: ['businessType', 'features', 'existingSite', 'references'] },
-  { value: 'pos', label: 'POS / business system', extras: ['businessType', 'features', 'references'] },
   { value: 'other', label: 'Something else', extras: [] },
 ]
 
@@ -35,6 +39,9 @@ const emptyForm = {
   sizes: '',
   installation: '',
   businessType: '',
+  audience: '',
+  channels: '',
+  systemNeed: '',
   features: '',
   existingSite: '',
   references: '',
@@ -213,6 +220,15 @@ export function CustomProjectPage() {
               )}
               {extras.includes('placement') && (
                 <Field label="Where will it go?" value={form.placement} onChange={set('placement')} hint="Indoors or outdoors, and roughly where on the building." optional />
+              )}
+              {extras.includes('audience') && (
+                <Field label="Who are you trying to reach?" hint="Customers, location, anything that shapes who should see it." value={form.audience} onChange={set('audience')} optional />
+              )}
+              {extras.includes('channels') && (
+                <Field label="Where do you already have a presence?" hint="Social accounts, a website, a mailing list — or none yet." value={form.channels} onChange={set('channels')} optional />
+              )}
+              {extras.includes('systemNeed') && (
+                <Field as="textarea" label="What should the system handle?" hint="For example sales at a counter, stock, reporting across branches. Point of sale is one option among these." value={form.systemNeed} onChange={set('systemNeed')} optional />
               )}
               {extras.includes('businessType') && (
                 <Field label="What does the business do?" value={form.businessType} onChange={set('businessType')} optional />
