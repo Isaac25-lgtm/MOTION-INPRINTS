@@ -239,7 +239,7 @@ describe('admin authorization', () => {
     for (const path of ['/api/admin/dashboard', '/api/admin/reports', '/api/admin/customers', '/api/admin/audit']) {
       const result = await read(await api(get(path)))
       expect(result.status, `${path} should be refused`).toBe(403)
-      expect(result.error.code).toBe('admin_required')
+      expect(result.error.code).toBe('owner_required')
     }
   })
 

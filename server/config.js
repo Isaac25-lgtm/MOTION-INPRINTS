@@ -55,6 +55,25 @@ export function serverConfig(source = process.env) {
     throw new Error('API_TRUSTED_CLIENT_HEADER must name the header your API runtime OVERWRITES with the real client address, or the literal "none" if the platform provides no such header. Naming a header the platform merely appends to lets any caller choose their own rate-limit bucket.')
   }
   const trustedClientHeader = declared === 'none' ? null : declared
+
+  /* The two people allowed into the management dashboard, by email address.
+   *
+   * Server-only. It must never be given a VITE_ name and never reach the
+   * browser: the frontend has no use for it, and publishing the owners' email
+   * addresses invites targeted phishing against the only accounts that matter.
+   *
+   * An address here is not a credential and grants nothing on its own. It is one
+   * half of a check whose other half is a cryptographically verified Neon Auth
+   * session — see resolveVerifiedIdentity() in server/auth.js. Someone who knows
+   * an owner's email still has to prove control of it through Neon Auth.
+   *
+   * Empty is a valid, safe state: no identity is approved, so nobody can be
+   * elevated. It fails closed rather than open.
+   */
+  const ownerAllowedEmails = (source.OWNER_ALLOWED_EMAILS || '')
+    .split(',')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
   return Object.freeze({
     databaseUrl: source.DATABASE_URL,
     authJwksUrl: source.NEON_AUTH_JWKS_URL,
@@ -62,6 +81,7 @@ export function serverConfig(source = process.env) {
     allowedOrigins: (source.API_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean),
     timeoutMs: Number(source.API_REQUEST_TIMEOUT_MS || 10000),
     trustedClientHeader: trustedClientHeader || null,
+    ownerAllowedEmails,
     rateLimit: { windowMs: Number(source.API_RATE_LIMIT_WINDOW_MS || 60000), max: Number(source.API_RATE_LIMIT_MAX_REQUESTS || 100), maxKeys: Number(source.API_RATE_LIMIT_MAX_KEYS || 10000) },
     storage: { endpoint: source.OBJECT_STORAGE_ENDPOINT, bucket: source.OBJECT_STORAGE_BUCKET, publicBaseUrl: source.OBJECT_STORAGE_PUBLIC_BASE_URL },
   })

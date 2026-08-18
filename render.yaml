@@ -55,6 +55,16 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
 
+      # The two people allowed into the management dashboard, comma separated.
+      # SERVER-ONLY. Never give this a VITE_ name and never add it to the static
+      # site: every variable there ships to the browser, and publishing the
+      # owners' addresses invites targeted phishing at the only accounts that
+      # matter. An address here is not a credential — it grants nothing without a
+      # verified Neon Auth session for that same address.
+      # Empty approves nobody, which is the safe failure.
+      - key: OWNER_ALLOWED_EMAILS
+        sync: false
+
       # Rate-limit identity. `none` is a decision on the record, not an omission.
       #
       # Render APPENDS to X-Forwarded-For rather than replacing it, so its first

@@ -144,16 +144,16 @@ describe('authorisation is decided by the database, never by the token', () => {
       const actor = await kit.authenticate(request)
 
       expect(actor.profile.role).toBe('customer')
-      await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'admin_required' })
+      await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'owner_required' })
     } finally { await kit.close() }
   })
 
-  it('admits an administrator whose stored role is admin', async () => {
-    const kit = await harness({ profile: { id: 'p2', auth_user_id: 'auth-user-1', role: 'admin' } })
+  it('admits a caller whose stored role is owner', async () => {
+    const kit = await harness({ profile: { id: 'p2', auth_user_id: 'auth-user-1', role: 'owner' } })
     try {
       const request = bearer(await kit.sign())
       const actor = await requireAdmin(request, kit.authenticate)
-      expect(actor.profile.role).toBe('admin')
+      expect(actor.profile.role).toBe('owner')
     } finally { await kit.close() }
   })
 
@@ -165,7 +165,7 @@ describe('authorisation is decided by the database, never by the token', () => {
       const actor = await requireAuth(request, kit.authenticate)
       expect(actor.profile).toBeNull()
       await expect(requireCustomer(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'profile_required' })
-      await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'admin_required' })
+      await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'owner_required' })
     } finally { await kit.close() }
   })
 })

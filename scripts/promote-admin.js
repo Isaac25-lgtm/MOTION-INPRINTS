@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /* One-time owner promotion.
  *
- * Grants `admin` on public.user_profiles to exactly one Neon Auth user id.
+ * Grants `owner` on public.user_profiles to exactly one Neon Auth user id.
+ *
+ * Secondary to the staff bootstrap, which provisions an approved owner
+ * automatically on sign-in. This remains for recovery: if OWNER_ALLOWED_EMAILS
+ * is misconfigured or an address changes, it grants access without a deploy.
  *
  *   node --env-file=.env scripts/promote-admin.js <auth_user_id>
  *   node --env-file=.env scripts/promote-admin.js <auth_user_id> --demote
@@ -75,7 +79,7 @@ async function main() {
       }
       console.log('')
       for (const row of rows) {
-        console.log(`  ${row.role === 'admin' ? '[admin]   ' : '[customer]'} ${row.auth_user_id}  ${row.full_name || '(no name)'}${row.company_name ? ` · ${row.company_name}` : ''}`)
+        console.log(`  ${row.role === 'owner' ? '[owner]   ' : '[customer]'} ${row.auth_user_id}  ${row.full_name || '(no name)'}${row.company_name ? ` · ${row.company_name}` : ''}`)
       }
       console.log('')
       return
@@ -102,7 +106,7 @@ async function main() {
     }
 
     const current = existing[0]
-    const role = demote ? 'customer' : 'admin'
+    const role = demote ? 'customer' : 'owner'
 
     if (current.role === role) {
       console.log(`\n  No change: ${target} is already ${role}.\n`)

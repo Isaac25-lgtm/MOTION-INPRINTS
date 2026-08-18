@@ -1,5 +1,6 @@
 import { ApiError, fail, json, ok, parsePaging, readJson } from './http.js'
 import { requireAdmin, requireAuth, requireCustomer, requireOwnership } from './auth.js'
+import { staffBootstrap } from './staff.js'
 import { buildUpdate, cartSchema, categoryPatchSchema, categorySchema, checkoutSchema, contentSchema, idSchema, orderStatusSchema, pricingRequestSchema, productPatchSchema, productSchema, profileSchema, projectIntakeSchema, projectPatchSchema, projectSchema, internalNotesSchema, proofResponseSchema, proofUploadSchema, quotePrepareSchema, quoteRequestSchema, quoteResponseSchema, uploadIntentSchema, validate } from './validation.js'
 import { createObjectKey, validateUpload } from './storage.js'
 import { calculatePrice, loadPricingContext } from './pricing.js'
@@ -41,7 +42,7 @@ const withMediaUrl = (baseUrl) => (row) => {
   return { ...rest, image: key && baseUrl ? `${baseUrl.replace(/\/$/, '')}/${key}` : null }
 }
 
-export function createApi({ db, authenticate = async () => null, logger = console, storage, mediaBaseUrl = null }) {
+export function createApi({ db, authenticate = async () => null, logger = console, storage, mediaBaseUrl = null, ownerAllowedEmails = [] }) {
   const decorate = withMediaUrl(mediaBaseUrl)
   return async function api(request) {
     const started = Date.now(); const url = new URL(request.url); const parts = routes(url.pathname)
@@ -68,6 +69,12 @@ export function createApi({ db, authenticate = async () => null, logger = consol
          WHERE (status = 'published' OR (status = 'scheduled' AND publish_from <= now()))
            AND (publish_from IS NULL OR publish_from <= now())
            AND (publish_until IS NULL OR publish_until > now())`))
+      /* Staff bootstrap. Turns a verified session into an owner profile when the
+         identity is on the server-side allowlist, and refuses neutrally otherwise.
+         Placed before /me so it is never mistaken for customer onboarding. */
+      else if (request.method === 'POST' && parts[0] === 'staff' && parts[1] === 'bootstrap') {
+        response = json(await staffBootstrap(request, db, authenticate, ownerAllowedEmails), 200)
+      }
       else if (request.method === 'GET' && parts[0] === 'me') { const actor = await requireCustomer(request, authenticate); response = ok(actor.profile) }
       else if (request.method === 'POST' && parts[0] === 'me') { const actor = await requireAuth(request, authenticate); const body = validate(profileSchema, await readJson(request)); if (actor.profile) throw new ApiError(409, 'profile_exists', 'A profile already exists.'); const rows = await db.query('INSERT INTO public.user_profiles(auth_user_id,role,full_name,phone,company_name) VALUES($1,$2,$3,$4,$5) RETURNING id,auth_user_id,role,full_name,phone,company_name', [actor.authUserId,'customer',body.fullName,body.phone || null,body.companyName || null]); response = ok(rows[0], 201) }
       else if (request.method === 'PATCH' && parts[0] === 'me') { const actor = await requireCustomer(request, authenticate); const body = validate(profileSchema, await readJson(request)); const rows = await db.query('UPDATE public.user_profiles SET full_name=$1,phone=$2,company_name=$3 WHERE id=$4 RETURNING id,auth_user_id,role,full_name,phone,company_name', [body.fullName,body.phone || null,body.companyName || null,actor.profile.id]); response = ok(rows[0]) }
@@ -764,7 +771,7 @@ async function adminApi(request, parts, db, authenticate) {
 }
 async function createUploadIntent(request, db, authenticate, storage) {
   const actor = await requireCustomer(request, authenticate); const body = validate(uploadIntentSchema, await readJson(request)); validateUpload(body)
-  if (adminOnlyPurposes.has(body.purpose) && actor.profile.role !== 'admin') throw new ApiError(403, 'admin_required', 'Administrator access is required for website and catalogue media.')
+  if (adminOnlyPurposes.has(body.purpose) && actor.profile.role !== 'owner') throw new ApiError(403, 'owner_required', 'Management access is required for website and catalogue media.')
   if (body.orderItemId) { const owned = await db.query("SELECT oi.id FROM public.order_items oi JOIN public.orders o ON o.id=oi.order_id WHERE oi.id=$1 AND o.customer_id=$2 AND oi.artwork_status IN ('awaiting_upload','received') AND o.status_code NOT IN ('completed','cancelled')",[body.orderItemId,actor.profile.id]); if (!owned[0]) throw new ApiError(404,'not_found','Order item not found.') }
   if (body.quoteRequestId) { const owned = await db.query('SELECT id FROM public.quote_requests WHERE id=$1 AND customer_id=$2',[body.quoteRequestId,actor.profile.id]); if (!owned[0]) throw new ApiError(404,'not_found','Quote request not found.') }
   const objectKey = createObjectKey({ purpose: body.purpose, extension: body.filename.split('.').pop() }); const visibility = body.purpose === 'customer_artwork' || body.purpose === 'design_proof' ? 'private' : 'public'
@@ -791,7 +798,7 @@ async function completeUpload(request, assetId, db, authenticate, storage) {
             EXISTS(SELECT 1 FROM public.order_item_media oim JOIN public.order_items oi ON oi.id=oim.order_item_id JOIN public.orders o ON o.id=oi.order_id WHERE oim.media_id=m.id AND o.customer_id=$2) OR
             EXISTS(SELECT 1 FROM public.quote_request_media qrm JOIN public.quote_requests qr ON qr.id=qrm.quote_request_id WHERE qrm.media_id=m.id AND qr.customer_id=$2) AS owned
      FROM public.media_assets m WHERE m.id=$1`, [id, actor.profile.id])
-  if (!asset || (actor.profile.role !== 'admin' && !asset.owned)) throw new ApiError(404, 'not_found', 'File not found.')
+  if (!asset || (actor.profile.role !== 'owner' && !asset.owned)) throw new ApiError(404, 'not_found', 'File not found.')
   if (typeof storage.verifyObject !== 'function') throw new ApiError(501, 'storage_verification_unavailable', 'The storage adapter cannot verify completed uploads.')
   await storage.verifyObject({ objectKey: asset.object_key })
   const [completed] = await db.query(
@@ -829,7 +836,7 @@ async function removeUpload(request, assetId, db, authenticate, storage) {
             EXISTS(SELECT 1 FROM public.order_item_media oim JOIN public.order_items oi ON oi.id=oim.order_item_id JOIN public.orders o ON o.id=oi.order_id WHERE oim.media_id=m.id AND o.customer_id=$2) OR
             EXISTS(SELECT 1 FROM public.quote_request_media qrm JOIN public.quote_requests qr ON qr.id=qrm.quote_request_id WHERE qrm.media_id=m.id AND qr.customer_id=$2) AS owned
      FROM public.media_assets m WHERE m.id=$1`, [id, actor.profile.id])
-  if (!asset || (actor.profile.role !== 'admin' && !asset.owned)) throw new ApiError(404, 'not_found', 'File not found.')
+  if (!asset || (actor.profile.role !== 'owner' && !asset.owned)) throw new ApiError(404, 'not_found', 'File not found.')
   if (asset.order_item_id && !['artwork_required', 'artwork_received', 'awaiting_payment', 'new'].includes(asset.order_status)) {
     throw new ApiError(409, 'artwork_locked', 'Artwork can no longer be removed because this order has progressed.')
   }
@@ -860,6 +867,6 @@ async function removeUpload(request, assetId, db, authenticate, storage) {
 }
 async function getFileAccess(request, assetId, db, authenticate, storage) {
   const id = validate(idSchema,assetId); const asset = (await db.query("SELECT id,object_key,visibility,purpose FROM public.media_assets WHERE id=$1 AND upload_status='available'",[id]))[0]; if (!asset) throw new ApiError(404,'not_found','File not found.')
-  if (asset.visibility === 'private') { const actor = await requireCustomer(request,authenticate); if (actor.profile.role !== 'admin') { const owned = await db.query('SELECT 1 FROM public.order_item_media oim JOIN public.order_items oi ON oi.id=oim.order_item_id JOIN public.orders o ON o.id=oi.order_id WHERE oim.media_id=$1 AND o.customer_id=$2 UNION ALL SELECT 1 FROM public.quote_request_media qrm JOIN public.quote_requests qr ON qr.id=qrm.quote_request_id WHERE qrm.media_id=$1 AND qr.customer_id=$2 LIMIT 1',[id,actor.profile.id]); if (!owned[0]) throw new ApiError(404,'not_found','File not found.') } }
+  if (asset.visibility === 'private') { const actor = await requireCustomer(request,authenticate); if (actor.profile.role !== 'owner') { const owned = await db.query('SELECT 1 FROM public.order_item_media oim JOIN public.order_items oi ON oi.id=oim.order_item_id JOIN public.orders o ON o.id=oi.order_id WHERE oim.media_id=$1 AND o.customer_id=$2 UNION ALL SELECT 1 FROM public.quote_request_media qrm JOIN public.quote_requests qr ON qr.id=qrm.quote_request_id WHERE qrm.media_id=$1 AND qr.customer_id=$2 LIMIT 1',[id,actor.profile.id]); if (!owned[0]) throw new ApiError(404,'not_found','File not found.') } }
   const download = await storage.createDownloadUrl({ objectKey: asset.object_key, visibility: asset.visibility }); return ok({ download })
 }

@@ -26,11 +26,12 @@
    and another bright mark — blue least of all — would turn a quiet index into a
    row of dots competing with the headline. */
 const DISCIPLINES = [
-  { label: 'Signage', accent: 'terracotta' },
-  { label: 'Commercial print', accent: 'blue' },
-  { label: 'Apparel', accent: 'ochre' },
+  // Same order as the category taxonomy, which puts Digital first.
+  { label: 'Digital systems', accent: 'blue' },
+  { label: 'Commercial print', accent: 'terracotta' },
+  { label: 'Signage', accent: 'ochre' },
   { label: 'Display', accent: 'olive' },
-  { label: 'Digital systems', accent: 'neutral' },
+  { label: 'Apparel', accent: 'neutral' },
 ]
 
 export function ProductionRail() {

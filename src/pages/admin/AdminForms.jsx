@@ -90,7 +90,7 @@ export function AdminProductFormPage() {
       if (editing) await adminService.updateProduct(id, body)
       else await adminService.createProduct(body)
       notify(editing ? 'Product updated.' : 'Product created.', 'success')
-      navigate('/admin/products')
+      navigate('/manager/products')
     } catch (error) {
       setErrors(fieldErrors(error))
       notify(error.message || 'That could not be saved.', 'error')
@@ -159,7 +159,7 @@ export function AdminProductFormPage() {
 
         <div className="cluster">
           <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create product'}</Button>
-          <Button to="/admin/products" variant="text">Cancel</Button>
+          <Button to="/manager/products" variant="text">Cancel</Button>
         </div>
       </form>
     </FormShell>
@@ -199,7 +199,7 @@ export function AdminCategoryFormPage() {
       if (editing) await adminService.updateCategory(id, body)
       else await adminService.createCategory(body)
       notify(editing ? 'Category updated.' : 'Category created.', 'success')
-      navigate('/admin/categories')
+      navigate('/manager/categories')
     } catch (error) {
       setErrors(fieldErrors(error)); notify(error.message || 'That could not be saved.', 'error')
     } finally { setBusy(false) }
@@ -227,7 +227,7 @@ export function AdminCategoryFormPage() {
         </label>
         <div className="cluster">
           <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create category'}</Button>
-          <Button to="/admin/categories" variant="text">Cancel</Button>
+          <Button to="/manager/categories" variant="text">Cancel</Button>
         </div>
       </form>
     </FormShell>
@@ -272,7 +272,7 @@ export function AdminProjectFormPage() {
       if (editing) await adminService.updateProject(id, body)
       else await adminService.createProject(body)
       notify(editing ? 'Project updated.' : 'Project created.', 'success')
-      navigate('/admin/projects')
+      navigate('/manager/projects')
     } catch (error) {
       setErrors(fieldErrors(error)); notify(error.message || 'That could not be saved.', 'error')
     } finally { setBusy(false) }
@@ -306,7 +306,7 @@ export function AdminProjectFormPage() {
         </label>
         <div className="cluster">
           <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create project'}</Button>
-          <Button to="/admin/projects" variant="text">Cancel</Button>
+          <Button to="/manager/projects" variant="text">Cancel</Button>
         </div>
       </form>
     </FormShell>

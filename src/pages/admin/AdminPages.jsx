@@ -19,15 +19,15 @@ import { adminService } from '../../services/adminService'
 
 export function AdminNav() {
   const links = [
-    { to: '/admin', label: 'Dashboard', end: true },
-    { to: '/admin/orders', label: 'Orders' },
-    { to: '/admin/quotes', label: 'Quotes' },
-    { to: '/admin/products', label: 'Products' },
-    { to: '/admin/categories', label: 'Categories' },
-    { to: '/admin/customers', label: 'Customers' },
-    { to: '/admin/projects', label: 'Work' },
-    { to: '/admin/content', label: 'Content' },
-    { to: '/admin/reports', label: 'Reports' },
+    { to: '/manager/dashboard', label: 'Dashboard', end: true },
+    { to: '/manager/orders', label: 'Orders' },
+    { to: '/manager/quotes', label: 'Quotes' },
+    { to: '/manager/products', label: 'Products' },
+    { to: '/manager/categories', label: 'Categories' },
+    { to: '/manager/customers', label: 'Customers' },
+    { to: '/manager/projects', label: 'Work' },
+    { to: '/manager/content', label: 'Content' },
+    { to: '/manager/reports', label: 'Reports' },
   ]
   return (
     <nav className="admin-nav" aria-label="Administration">
@@ -91,7 +91,7 @@ export function AdminDashboardPage() {
                   {data.needsAttention.map(row => (
                     <li key={row.id} className="attention-row">
                       <div className="stack stack--sm">
-                        <Link to={`/admin/orders/${row.id}`} className="t-h4">{row.reference}</Link>
+                        <Link to={`/manager/orders/${row.id}`} className="t-h4">{row.reference}</Link>
                         <span className="t-meta">{row.customer} · {row.reason}</span>
                       </div>
                       <span className="t-price">{formatAmount(row.total, row.currency)}</span>
@@ -109,7 +109,7 @@ export function AdminDashboardPage() {
                   <ul className="stack stack--sm">
                     {data.recentActivity.map(row => (
                       <li key={row.id} className="attention-row">
-                        <Link to={`/admin/orders/${row.id}`}>{row.reference}</Link>
+                        <Link to={`/manager/orders/${row.id}`}>{row.reference}</Link>
                         <span className="t-meta">{row.who} · {row.detail}</span>
                       </li>
                     ))}
@@ -163,7 +163,7 @@ export function AdminOrdersPage() {
                 <tbody>
                   {rows.map(order => (
                     <tr key={order.id}>
-                      <td><Link to={`/admin/orders/${order.id}`}>{order.order_number}</Link></td>
+                      <td><Link to={`/manager/orders/${order.id}`}>{order.order_number}</Link></td>
                       <td>{order.contact_name}</td>
                       <td><Badge>{order.status_code.replace(/_/g, ' ')}</Badge></td>
                       <td>{formatAmount(order.total_amount, order.currency)}</td>
@@ -416,7 +416,7 @@ export function AdminCustomersPage() {
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.id}>
-                      <td><Link to={`/admin/customers/${row.id}`}>{row.full_name}</Link></td>
+                      <td><Link to={`/manager/customers/${row.id}`}>{row.full_name}</Link></td>
                       <td>{row.company_name || '—'}</td>
                       <td>{row.phone || '—'}</td>
                       <td>{row.order_count}</td>
@@ -460,7 +460,7 @@ export function AdminCustomerDetailPage() {
             <ul className="stack stack--sm">
               {orders.map(order => (
                 <li key={order.id} className="attention-row">
-                  <Link to={`/admin/orders/${order.id}`}>{order.order_number}</Link>
+                  <Link to={`/manager/orders/${order.id}`}>{order.order_number}</Link>
                   <span className="t-meta">{order.status_code.replace(/_/g, ' ')} · {formatAmount(order.total_amount, order.currency)}</span>
                 </li>
               ))}

@@ -116,7 +116,7 @@ export function SignInPage() {
   return (
     <AuthShell
       title="Sign in"
-      intro="Access your orders, quotes and design proofs."
+      intro="Optional. Sign in to see saved details, past orders and quotes, and to approve proofs."
       footer={(
         <p className="t-body-sm t-muted">
           No account? <Link to="/sign-up" className="link">Create one</Link>. You can also{' '}
@@ -132,6 +132,14 @@ export function SignInPage() {
       {oauthFailed && (
         <p className="field__error" role="alert">Google sign-in did not complete. Try again, or use your email and password.</p>
       )}
+
+      {/* An account is a convenience, not a gate. Customers can browse, request a
+          quote, order and track entirely as guests, and saying so here stops the
+          sign-in page reading as a checkout requirement. */}
+      <p className="t-body-sm t-muted state" role="note">
+        Creating an account is optional. You can browse, request a quote, place an order
+        and track it as a guest.
+      </p>
 
       <GoogleChoice label="or sign in with email" next="/account" onError={setError} />
 
@@ -217,9 +225,17 @@ export function SignUpPage() {
   return (
     <AuthShell
       title="Create an account"
-      intro="Keep your order history, approve proofs and reorder past jobs."
+      intro="Optional. An account keeps your order history, proofs and past jobs in one place."
       footer={<p className="t-body-sm t-muted">Already registered? <Link to="/sign-in" className="link">Sign in</Link>.</p>}
     >
+      {/* An account is a convenience, not a gate. Customers can browse, request a
+          quote, order and track entirely as guests, and saying so here stops the
+          sign-in page reading as a checkout requirement. */}
+      <p className="t-body-sm t-muted state" role="note">
+        Creating an account is optional. You can browse, request a quote, place an order
+        and track it as a guest.
+      </p>
+
       <GoogleChoice label="or create an account with email" next="/account/profile" onError={setError} />
 
       <form className="stack" onSubmit={submit} noValidate>

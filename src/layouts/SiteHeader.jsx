@@ -10,10 +10,11 @@ import { useCart } from '../features/cart/CartProvider'
 import { useAuth } from '../auth/AuthProvider'
 
 export const primaryNav = [
+  // Digital leads the navigation as it leads the taxonomy.
+  { to: '/services/digital-solutions', label: 'Digital Solutions' },
   { to: '/shop', label: 'Shop' },
   { to: '/services', label: 'Services' },
   { to: '/work', label: 'Our Work' },
-  { to: '/services/digital-solutions', label: 'Digital Solutions' },
   { to: '/about', label: 'About' },
   { to: '/contact', label: 'Contact' },
 ]
@@ -49,7 +50,7 @@ function MobileNav({ open, onClose, cartCount, isAuthenticated }) {
           ))}
         </div>
         <div className="mobile-nav__secondary">
-          <Link to={isAuthenticated ? '/account' : '/sign-in'} onClick={onClose}>{isAuthenticated ? 'Your account' : 'Sign in'}</Link>
+          <Link to="/account" onClick={onClose}>{isAuthenticated ? 'Your account' : 'Account'}</Link>
           <Link to="/cart" onClick={onClose}>Cart{cartCount ? ` (${cartCount})` : ''}</Link>
           <Link to="/track-order" onClick={onClose}>Track an order</Link>
           <Link to="/custom-project" onClick={onClose}>Start a custom project</Link>
@@ -89,7 +90,10 @@ export function SiteHeader() {
             <IconButton icon="search" label="Search" onClick={() => setSearchOpen(true)} />
             {/* Sends signed-in visitors to their account and everyone else to
                 sign-in, so the control never leads somewhere that redirects. */}
-            <IconButton icon="account" label={isAuthenticated ? 'Your account' : 'Sign in'} to={isAuthenticated ? '/account' : '/sign-in'} />
+            {/* Always "Account", never "Sign in". An account is optional here — a
+                visitor can browse, order and track as a guest — so labelling the
+                icon "Sign in" implies a requirement that does not exist. */}
+            <IconButton icon="account" label="Account" to="/account" />
             <IconButton icon="cart" label={`Cart${cartCount ? `, ${cartCount} items` : ', empty'}`} to="/cart" className="cart-indicator">
               {cartCount > 0 && <span className="cart-indicator__count" aria-hidden="true">{cartCount}</span>}
             </IconButton>

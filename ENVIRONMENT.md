@@ -85,6 +85,33 @@ Google is enabled on this project using **Neon's shared development keys**, whic
 
 No Google client secret exists in this repository, and none should.
 
+## Guest-first, and who may manage
+
+**Customers never need an account.** Browsing, configuring, cart, checkout, quote and custom-project requests, artwork and order tracking all work with no session. An account adds saved details, history, proof approvals and reordering — nothing more. `tests/guest-first.test.js` fails if a guard is ever added to a purchase route.
+
+**Management lives at `/manager`**, unlinked from the header, footer, customer account area and navigation. `/admin` redirects there for old links. The hiding is not the protection: every management API independently verifies the session and the stored role, so knowing the URL gains an unauthorised visitor nothing.
+
+### How an owner is authorised
+
+| Variable | Exposure | Value |
+| --- | --- | --- |
+| `OWNER_ALLOWED_EMAILS` | **Server-only, `motion-api` only** | Comma-separated addresses of the two owners |
+
+Never give it a `VITE_` name and never add it to the static site — everything there ships to the browser. A test walks `src/` and fails if the name appears anywhere in frontend source.
+
+The chain, in order:
+
+1. The owner signs in at `/manager` with **Google or email and password** — their own identity, never a shared login.
+2. The browser calls `POST /api/staff/bootstrap` **with no arguments**.
+3. The server resolves the email from **`neon_auth.user`**, keyed on the `sub` of the cryptographically verified token. Not from the request body, and not from a token claim — an audit of that table confirmed it holds `id`, `email` and `emailVerified`, which is a better source than an undocumented claim.
+4. The address must be **verified** and on the allowlist. Without the verification check, anyone could register an owner's address they do not control and wait to be elevated.
+5. Only then is the profile created, or an existing customer profile **upgraded in place**. The write is an upsert on a unique `auth_user_id`, so repeated sign-ins can never duplicate it.
+6. The grant is recorded in `admin_audit_log`.
+
+Anyone else gets one neutral message — *"This account is not authorised for Motion staff access"* — identical for an unknown address, an unverified one and an ordinary customer. Nothing is created and no role is changed.
+
+**Google proves identity only.** It never grants access on its own.
+
 ## Owner bootstrap
 
 Everyone who signs up is a `customer`. There is no HTTP route, UI control, environment variable or automatic first-user rule that grants `admin` — promotion is a server-only script requiring database access.

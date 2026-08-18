@@ -177,7 +177,7 @@
      margin someone forgot. Combined with the 32px removed from the category
      section's top padding, the fold gains ~48px without the hero feeling
      cramped. */
-  .hero { padding-block: var(--space-6); gap: var(--space-4); }
+  .hero { padding-block: var(--space-6); gap: var(--space-3); }
 }
 
 /* Kicker: entirely neutral. Its colour was subtracted — see HomePage.jsx. */
@@ -240,7 +240,7 @@
    A second `.hero__actions` block used to sit here and, being later in the
    cascade at equal specificity, silently dropped the centring declared above.
    A `.hero__statement` rule sat beside it matching nothing at all. Both gone. */
-.hero__lines { display: grid; }
+.hero__lines { display: grid; line-height: var(--leading-tight); }
 .hero__line { display: block; }
 
 /* The coloured full stops.

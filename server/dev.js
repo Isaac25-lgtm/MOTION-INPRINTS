@@ -48,6 +48,8 @@ const api = createApi({
   storage: createStorageAdapter(config.storage),
   mediaBaseUrl: config.storage.publicBaseUrl,
   authenticate: createAuthenticator({ jwksUrl: config.authJwksUrl, issuer: config.authIssuer, db }),
+  // Server-only allowlist. Never reaches the browser.
+  ownerAllowedEmails: config.ownerAllowedEmails,
 })
 const apiHandler = createHttpHandler(api, config, { getClientKey: createClientKeyResolver(config) })
 

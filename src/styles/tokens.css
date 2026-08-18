@@ -164,7 +164,12 @@
      entire viewport before any content appeared — the oversized-hero pattern the
      brief explicitly rules out. Capped well below that: presence now comes from
      weight, width and colour rather than sheer size. */
-  --size-display: clamp(2.25rem, 1.5rem + 2.6vw, 3.5rem);
+  /* Capped at 3rem, down from 3.5rem, because the statement is now four lines
+     rather than three. At 56px four lines measure ~228px against the old ~171px,
+     which would have pushed the actions and "What we make" down by the better
+     part of sixty. At 48px they measure ~196px, and the rest is recovered from
+     the hero gap. Presence still comes from weight and width, not size. */
+  --size-display: clamp(2rem, 1.25rem + 2.2vw, 3rem);
   --size-h1: clamp(1.875rem, 1.4rem + 1.9vw, 2.75rem);
   --size-h2: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
   --size-h3: clamp(1.25rem, 1.13rem + 0.55vw, 1.625rem);

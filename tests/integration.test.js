@@ -115,6 +115,7 @@ describeIfDb('schema behaviour (real database)', () => {
       '0004_quotes_and_orders.sql', '0005_portfolio_and_cms.sql', '0006_quote_status_vocabulary.sql',
       '0007_accepted_quote_immutability.sql', '0008_quote_access_and_lifecycle.sql',
       '0009_catalogue_relationships_and_uploads.sql', '0010_proofs_tracking_and_audit.sql', '0011_proof_evidence_integrity.sql', '0012_proof_supersession_invariant.sql',
+      '0013_owner_role_and_digital_first.sql',
     ])
   })
 
@@ -439,7 +440,8 @@ describeIfDb('schema behaviour (real database)', () => {
              (SELECT count(*) FROM public.products) AS products,
              (SELECT count(*) FROM public.projects) AS projects`)
     expect(Number(counts.parents)).toBe(7)
-    expect(Number(counts.children)).toBe(24)
+    // 24 seeded in 0002, plus Digital Marketing added by 0013.
+    expect(Number(counts.children)).toBe(25)
     // No invented catalogue or portfolio.
     expect(Number(counts.products)).toBe(0)
     expect(Number(counts.projects)).toBe(0)
@@ -618,7 +620,7 @@ describeIfDb('schema behaviour (real database)', () => {
       const database = { query: async (statement, parameters = []) => (await client.query(statement, parameters)).rows }
       const api = createApi({
         db: database,
-        authenticate: async () => ({ authUserId: '11111111-1111-4111-8111-111111111111', profile: { id: 'admin-profile', role: 'admin' } }),
+        authenticate: async () => ({ authUserId: '11111111-1111-4111-8111-111111111111', profile: { id: 'admin-profile', role: 'owner' } }),
         logger: { info() {}, error() {} },
       })
       const response = await api(new Request('https://motion.test/api/admin/content/announcement', {
@@ -846,7 +848,7 @@ describeIfDb('owner promotion script', () => {
     expect(first.out).toContain(TEST_ID)
 
     const { rows } = await client.query('SELECT role FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-    expect(rows[0].role).toBe('admin')
+    expect(rows[0].role).toBe('owner')
 
     // Running it again changes nothing rather than erroring.
     const again = await promote([TEST_ID])

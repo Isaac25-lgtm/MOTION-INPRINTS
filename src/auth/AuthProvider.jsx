@@ -105,7 +105,8 @@ export function AuthProvider({ children }) {
     ...state,
     // Convenience flags for rendering only.
     isAuthenticated: state.status === 'authenticated',
-    isAdmin: state.profile?.role === 'admin',
+    isOwner: state.profile?.role === 'owner',
+    isAdmin: state.profile?.role === 'owner',
     configured: isConfigured(),
     googleEnabled: isGoogleEnabled(),
     signIn, signUp, signInWithGoogle, signOut,

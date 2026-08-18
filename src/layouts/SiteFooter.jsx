@@ -4,12 +4,13 @@ import { Icon } from '../components/ui/Icon'
 import { useContactDetails } from '../content/SiteContentProvider'
 
 const serviceLinks = [
-  { to: '/services/signage', label: 'Signage' },
-  { to: '/services/printing', label: 'Printing' },
-  { to: '/services/apparel', label: 'Branded apparel' },
-  { to: '/services/promotional-display', label: 'Promotional & display' },
-  { to: '/services/decor', label: 'Wall décor' },
+  // Same order as the category taxonomy, which leads with Digital Solutions.
   { to: '/services/digital-solutions', label: 'Digital solutions' },
+  { to: '/services/printing', label: 'Printing' },
+  { to: '/services/signage', label: 'Signage' },
+  { to: '/services/promotional-display', label: 'Promotional & display' },
+  { to: '/services/apparel', label: 'Branded apparel' },
+  { to: '/services/decor', label: 'Wall décor' },
 ]
 
 const shopLinks = [
@@ -50,8 +51,9 @@ export function SiteFooter() {
             {/* The footer has room for the complete logo, strapline included. */}
             <Wordmark variant="lockup" />
             <p className="t-body-sm t-muted" style={{ maxWidth: '26rem' }}>
-              Design, print and brand production in Kampala — signage, commercial printing,
-              promotional materials, branded apparel and digital business systems.
+              Digital, design, print and brand production in Kampala — websites, e-commerce,
+              digital marketing and business systems, alongside signage, commercial printing,
+              promotional materials and branded apparel.
             </p>
             {/* Contact details render only once the owner has published them. */}
             {(phone || whatsapp || email || address) && (

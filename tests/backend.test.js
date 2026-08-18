@@ -123,7 +123,7 @@ describe('backend access and input rules', () => {
   it('requires admin role, not merely authentication, for product changes', async () => {
     const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'auth-id', profile: { id: 'customer-id', role: 'customer' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Cards', slug: 'cards', pricingType: 'quote_only', quoteRequired: true }) })))
-    expect(result.status).toBe(403); expect(result.error.code).toBe('admin_required')
+    expect(result.status).toBe(403); expect(result.error.code).toBe('owner_required')
   })
 
   it('separates rate-limit buckets per client instead of pooling every visitor', () => {
@@ -191,7 +191,7 @@ describe('backend access and input rules', () => {
   it('applies a partial admin PATCH without demanding every field', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'product-id', slug: 'cards', status: 'published' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }) })))
     expect(result.status).toBe(200)
     expect(seen[0].statement).toContain('SET status=$1')
@@ -200,7 +200,7 @@ describe('backend access and input rules', () => {
   })
 
   it('rejects an admin PATCH that carries no fields', async () => {
-    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{}' })))
     expect(result.status).toBe(422); expect(result.error.code).toBe('empty_update')
   })
@@ -214,10 +214,10 @@ describe('backend access and input rules', () => {
     const customer = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
     const body = JSON.stringify({ filename: 'x.png', mimeType: 'image/png', byteSize: 100, purpose: 'product_image' })
     const blocked = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
-    expect(blocked.status).toBe(403); expect(blocked.error.code).toBe('admin_required')
+    expect(blocked.status).toBe(403); expect(blocked.error.code).toBe('owner_required')
     const fakeProof = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'proof.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'design_proof' }) })))
     expect(fakeProof.status).toBe(403)
-    const admin = createApi({ db, storage, authenticate: async () => ({ authUserId: 'a', profile: { id: 'pa', role: 'admin' } }), logger: silentLogger })
+    const admin = createApi({ db, storage, authenticate: async () => ({ authUserId: 'a', profile: { id: 'pa', role: 'owner' } }), logger: silentLogger })
     const allowed = await responseBody(await admin(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
     expect(allowed.status).toBe(201)
     // Customers keep their own private artwork route.
@@ -244,7 +244,7 @@ describe('backend access and input rules', () => {
   it('updates one content entry rather than every key in the section', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c', section: 'contact', entry_key: 'details' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/content/contact', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entryKey: 'details', value: { phone: '' } }) })))
     expect(result.status).toBe(200)
     expect(seen[0].statement).toContain('WHERE section = $8 AND entry_key = $9')
@@ -259,7 +259,7 @@ describe('backend access and input rules', () => {
   it('clears a stale schedule when content is published immediately', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/content/announcement', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }),
     })))
@@ -276,7 +276,7 @@ describe('backend access and input rules', () => {
       seen.push({ statement, values })
       return [{ id: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', status_code: 'sent', currency: 'UGX' }]
     } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d/send', { method: 'POST' })))
     expect(result.status).toBe(200)
     expect(result.data.accessToken).toBeTruthy()
@@ -286,7 +286,7 @@ describe('backend access and input rules', () => {
   })
 
   it('does not expose the legacy quote PATCH bypass', async () => {
-    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'admin' } }), logger: silentLogger })
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ statusCode: 'sent' }),
     })))

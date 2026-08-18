@@ -58,9 +58,13 @@ function Hero() {
      inherits the display metrics, so it reads as typography rather than as
      three dots parked next to some text. */
   const statement = [
+    // Digital leads, and takes Motion blue — the brand colour marks the line the
+    // business now leads with. The other three keep the restrained editorial
+    // punctuation they already had.
+    { word: 'Digital', accent: 'blue' },
     { word: 'Design', accent: 'terracotta' },
-    { word: 'Print', accent: 'blue' },
-    { word: 'Brand', accent: 'ochre' },
+    { word: 'Print', accent: 'ochre' },
+    { word: 'Brand', accent: 'olive' },
   ]
 
   return (
@@ -69,7 +73,7 @@ function Hero() {
           removed in the subtraction pass: with a blue mark already in the rail
           and a blue full stop in the headline, it was the third blue on one fold
           and the only one carrying no meaning. The periods are the signature. */}
-      <p className="t-eyebrow hero__kicker">Kampala · Design, print &amp; brand</p>
+      <p className="t-eyebrow hero__kicker">Kampala · Digital, design, print &amp; brand</p>
 
       <h1 className="t-display hero__lines" id="hero-title">
         {headline || statement.map(({ word, accent }, index) => (
@@ -85,7 +89,7 @@ function Hero() {
       <p className="t-body-lg hero__standfirst">
         {/* Fallback describes what Motion offers. It makes no claim about how the
             work is produced — that is for the owner to state through the CMS. */}
-        {standfirst || 'Signage, commercial print and branded products—supported by the websites, online stores and business systems that keep brands moving.'}
+        {standfirst || 'Websites, e-commerce, digital marketing and business systems—alongside signage, commercial print and branded products.'}
       </p>
 
       <div className="hero__actions">
@@ -255,14 +259,21 @@ function CustomProjects() {
   )
 }
 
-/* 6. Digital solutions — the second half of the business, on a dark band so it
-   reads as part of Motion rather than a separate technology company. Deep brand
-   blue rather than neutral black keeps the whole page on one palette. */
+/* 6. Digital solutions — what Motion now leads with, on the page's one dark band.
+   Deep ink blue rather than neutral black keeps the whole page on one palette
+   while marking this as a genuine change in hierarchy. */
 function DigitalSolutions() {
+  /* Four services, quote-first. No price or package is stated because none has
+     been defined — inventing one would commit Motion to work it has not scoped.
+
+     "Business Systems" replaced "Business Point-of-Sale Systems": point of sale
+     is one system Motion can build, not the limit of what it offers, and the
+     narrower name was positioning the business out of the rest. */
   const offerings = [
     { slug: 'website-design', name: 'Website design', note: 'Business and campaign sites, designed and built end to end.' },
     { slug: 'ecommerce-website-development', name: 'E-commerce development', note: 'Online stores with catalogue, checkout and order management.' },
-    { slug: 'business-point-of-sale-systems', name: 'Point-of-sale systems', note: 'Sales, stock and reporting systems for counters and branches.' },
+    { slug: 'digital-marketing', name: 'Digital marketing', note: 'Campaigns, social content and paid promotion, planned around what the business actually sells.' },
+    { slug: 'business-systems', name: 'Business systems', note: 'Sales, stock, reporting and operational systems — point of sale among them — built to fit how a business already works.' },
   ]
   return (
     <section className="section section--brand-deep" aria-labelledby="digital-title">
@@ -270,13 +281,14 @@ function DigitalSolutions() {
         <div className="section-head">
           <div className="section-head__text">
             <p className="t-eyebrow">Digital solutions</p>
-            <h2 className="t-h2" id="digital-title">The same studio, working on screen</h2>
+            <h2 className="t-h2" id="digital-title">Built for screen as well as for print</h2>
             <p className="t-body t-muted t-measure">
-              Motion builds the digital side of a brand as well as the printed one — so
-              signage, packaging and storefront speak with one voice.
+              Websites, online stores, marketing and the systems a business runs on —
+              designed by the same studio that makes its signage and print, so every
+              part speaks with one voice. Scoped and quoted per project.
             </p>
           </div>
-          <Button to="/services/digital-solutions" variant="text" arrow>Digital services</Button>
+          <Button to="/services/digital-solutions" variant="text" arrow>Request a quote</Button>
         </div>
         <ul className="detail-list">
           {offerings.map(offering => (
