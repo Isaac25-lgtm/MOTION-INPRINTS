@@ -195,9 +195,34 @@ export const authClient = {
     const client = await getClient()
     if (!client) return null
     try {
-      const { data } = await client.token()
-      return data?.token || null
-    } catch { return null }
+      /* Shape-tolerant on purpose.
+       *
+       * This previously destructured `{ data }` and read `data.token`, which is
+       * the documented Better Auth shape. But `createAuthClient` wraps Better
+       * Auth, and a wrapper is free to return the payload unwrapped or the token
+       * as a bare string. If it does, `data` is undefined, this returns null,
+       * every request goes out with no Authorization header, and the API answers
+       * `authentication_required` — with nothing in the browser to indicate why,
+       * because the failure is a silent null rather than an error.
+       *
+       * Accepting all three shapes costs nothing and removes a whole class of
+       * silent breakage across SDK versions. Verified against the installed
+       * 0.7.0-beta: `client.token()` is the real endpoint (401 without a
+       * session), while `getJWTToken()` is not exposed on this client and 404s —
+       * it belongs to `createInternalNeonAuth`, a different constructor.
+       */
+      const result = await client.token()
+      const token = typeof result === 'string'
+        ? result
+        : result?.data?.token ?? result?.token ?? result?.data ?? null
+      return typeof token === 'string' && token.length > 0 ? token : null
+    } catch {
+      /* A missing token is not an error the caller can act on: the request
+         simply goes out unauthenticated and the API refuses it. Anything thrown
+         here would otherwise surface as a broken page rather than a sign-in
+         prompt. */
+      return null
+    }
   },
 
   async signOut() {
