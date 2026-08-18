@@ -8,6 +8,7 @@ Copy `.env.example` to `.env` for local development. `.env` is ignored by Git. V
 | `VITE_APP_URL` | Public frontend URL | Browser-safe | `.env` | Render Static Site |
 | `VITE_API_BASE_URL` | Base URL of the secure API | Browser-safe | `.env` | Render Static Site |
 | `VITE_NEON_AUTH_URL` | Neon Auth base URL — the only auth value the browser needs. Neon Console → Auth → Configuration. Include the full path (`…/neondb/auth`), not just the host. | **Public** | `.env` | Render Static Site / Neon branch config |
+| `VITE_NEON_AUTH_VERIFICATION` | `link` (default) or `code`, matching Neon Console → Auth → Verification method. The browser cannot read that setting, so it is declared. Every page is written for a link; with `code` the staff pages report the mismatch instead of claiming a link was sent. | **Public** | `.env` (may be blank) | Render Static Site |
 | `VITE_NEON_AUTH_GOOGLE` | Set to `false` to hide "Continue with Google". Anything else (or unset) shows it. Google is enabled per-project in the Neon console and the browser cannot detect it, so it is declared. | **Public** | `.env` (may be blank) | Render Static Site |
 | `DATABASE_URL` | Neon Postgres connection string | Server-only | API runtime `.env` | secure API/Neon runtime only |
 | `NEON_AUTH_JWKS_URL` | Public keys for token verification. The Auth URL **plus** `/.well-known/jwks.json`. | Server-only (not secret, but unused by the browser) | API runtime `.env` | secure API/Neon runtime only |

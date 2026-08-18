@@ -33,12 +33,14 @@ import { staffService } from '../services/staffService'
 const REFUSED = 'This account is not authorised for Motion staff access.'
 
 export function ManagerSignInPage() {
-  const { configured, googleEnabled, isAuthenticated, isOwner, signIn, signInWithGoogle, refreshProfile } = useAuth()
+  const { configured, googleEnabled, isAuthenticated, isOwner, signIn, signInWithGoogle, refreshProfile, verificationMethod } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [checking, setChecking] = useState(false)
+  const [unverified, setUnverified] = useState(null)
+  const [resent, setResent] = useState(false)
 
   /* Runs after any successful sign-in, and on arrival back from Google. Asking
      twice is harmless — the server upsert is idempotent. */
@@ -66,17 +68,27 @@ export function ManagerSignInPage() {
 
   const submit = async (event) => {
     event.preventDefault()
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setUnverified(null); setResent(false)
     try {
       await signIn(form)
       await bootstrap()
     } catch (caught) {
-      /* Never distinguishes an unknown address from a wrong password, and never
-         reveals whether the address is a staff one. */
-      setError(caught.code === 'email_not_verified'
-        ? 'Confirm your email address first. We sent a link when the account was created.'
-        : 'Those details do not match a Motion staff account.')
+      /* An unconfirmed address is a different problem from a wrong password and
+         has a different fix, so it gets its own state with a resend action.
+         Everything else stays one flat message that never distinguishes an
+         unknown address from a wrong password, and never reveals whether the
+         address belongs to staff. */
+      if (caught.code === 'email_not_verified') setUnverified(form.email)
+      else setError('Those details do not match a Motion staff account.')
     } finally { setBusy(false) }
+  }
+
+  /* Returns to /manager rather than the customer sign-in page — an owner
+     confirming their address must land back in the staff flow. The response is
+     identical whether or not the address needs confirming. */
+  const resend = async () => {
+    await authClient.resendVerification({ email: unverified, next: '/manager' })
+    setResent(true)
   }
 
   const google = async () => {
@@ -117,19 +129,43 @@ export function ManagerSignInPage() {
               <Field label="Password" type="password" value={form.password} required autoComplete="current-password"
                 onChange={(event) => setForm({ ...form, password: event.target.value })} />
               {error && <p className="field__error" role="alert">{error}</p>}
+
+              {unverified && (
+                <div className="state" role="alert">
+                  {verificationMethod === 'code' ? (
+                    <p className="t-body-sm">
+                      This address is not confirmed, and this installation is configured for
+                      verification <strong>codes</strong> rather than links. Switch the Neon Auth
+                      verification method to “link”, or set <code>VITE_NEON_AUTH_VERIFICATION</code> to match.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="t-body-sm">
+                        Confirm your email address first. We sent a link when the account was created.
+                      </p>
+                      <Button type="button" variant="text" size="sm" onClick={resend}>Send the link again</Button>
+                      {resent && (
+                        <p className="t-body-sm t-muted" role="status">
+                          If that address still needs confirming, a new link is on its way.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
               <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
             </form>
 
-            {/* Two distinct paths, because they solve different problems.
-                "Set up" creates a password account for someone who has only ever
-                used Google — the reset flow acts on an existing password
-                credential and is not documented to mint one, so pointing there
-                would have promised behaviour I had not verified. "Forgotten"
-                is the reset flow, which is well-defined once a password exists. */}
+            {/* Both go through the reset flow, which acts on an identity that
+                already exists — so an owner who has only ever used Google gains a
+                password on the SAME account rather than a second one. The two
+                entry points differ only in wording, because "set" and "forgotten"
+                are different problems to the person reading them. */}
             <p className="t-body-sm t-muted">
-              <Link className="link" to="/manager/activate">Set up email and password access</Link>
+              <Link className="link" to="/manager/activate">Set password for email sign-in</Link>
               {' · '}
-              <Link className="link" to="/reset-password">Forgotten your password?</Link>
+              <Link className="link" to="/reset-password?next=%2Fmanager">Forgotten your password?</Link>
             </p>
           </>
         )}

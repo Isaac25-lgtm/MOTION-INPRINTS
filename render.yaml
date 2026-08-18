@@ -103,6 +103,12 @@ services:
       # Public. The full Neon Auth URL, including the /neondb/auth path.
       - key: VITE_NEON_AUTH_URL
         sync: false
+      # Public. "link" (default) or "code", matching the Neon console setting.
+      # The browser cannot detect it, so it is declared; the staff pages report a
+      # mismatch rather than claiming a link was sent.
+      - key: VITE_NEON_AUTH_VERIFICATION
+        sync: false
+
       # Public. `true` shows the Google button; only the exact string `false`
       # hides it. Email and password sign-in is available either way.
       - key: VITE_NEON_AUTH_GOOGLE

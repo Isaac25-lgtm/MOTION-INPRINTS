@@ -5,61 +5,55 @@ import { Field } from '../components/ui/Form'
 import { useAuth } from '../auth/AuthProvider'
 import { authClient } from '../auth/authClient'
 
-/* Staff password-account setup.
+/* Set a password for email sign-in, on an identity that already exists.
  *
- * Why this exists rather than a "set a password" link:
+ * The case this solves: an owner has signed in with Google, so Neon Auth holds
+ * their identity with a `google` account row and no password. They want the
+ * option of email and password as well — one account, two ways in.
  *
- *   The /manager page previously offered "Set or reset your staff password",
- *   pointing at the customer reset flow. That was a claim I had not verified.
- *   Better Auth's reset flow acts on an existing password credential; whether it
- *   will mint one for an identity that has only ever signed in with Google is
- *   not documented by Neon and I did not test it — so the page was promising
- *   behaviour that may simply not happen, with no error to explain the silence.
+ * It uses the password-reset flow deliberately. Reset acts on the EXISTING user
+ * rather than creating anything, so the owner keeps a single identity and their
+ * Google sign-in continues to work untouched. An earlier version of this page
+ * called sign-up instead, which would have produced a second account for the
+ * same person — splitting their profile, their orders and their access.
  *
- *   This route makes the same outcome explicit and testable: it creates an
- *   ordinary email-and-password account through the documented sign-up call. If
- *   the address already exists, the message says so and points at the reset flow,
- *   which is well-defined for an account that does have a password.
+ * The link is emailed to the address itself, which is what makes this safe: it
+ * proves control of the mailbox rather than granting anything to whoever asked.
  *
  * What it deliberately does NOT do:
  *
- *   It grants nothing. No role is sent, none would be accepted, and the page has
- *   no idea whether the address is an owner — the allowlist never reaches the
- *   browser. The result is identical for an approved owner and a stranger: an
- *   account, and an email to verify. Authorisation happens later and elsewhere,
- *   in the server-side staff bootstrap, which is the only thing that can write
- *   the owner role.
+ *   It grants no permission. It sends no role, and none would be accepted. The
+ *   page cannot tell whether an address is an owner — the allowlist never
+ *   reaches the browser — so the response is identical for an approved owner, an
+ *   ordinary customer and an address that does not exist. Authorisation happens
+ *   later and elsewhere, in the server-side staff bootstrap, which is the only
+ *   thing that can write the owner role.
  *
- *   So an unapproved person can use this page and end up with exactly what they
- *   would have got from the public sign-up page: a customer account.
+ * Google stays optional throughout: an owner may use Google only, a password
+ * only, or both.
  */
 export function ManagerActivatePage() {
-  const { configured } = useAuth()
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
+  const { configured, verificationMethod } = useAuth()
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const [done, setDone] = useState(null)
+  const [sent, setSent] = useState(null)
+  const [resent, setResent] = useState(false)
 
   const submit = async (event) => {
     event.preventDefault()
-    if (form.password !== form.confirm) { setError('The two passwords do not match.'); return }
-    if (form.password.length < 12) { setError('Use at least 12 characters for a staff password.'); return }
-    setBusy(true); setError(null)
-    try {
-      await authClient.signUp({ email: form.email, password: form.password, name: form.name })
-      setDone(form.email)
-    } catch (caught) {
-      setError(caught.code === 'email_in_use'
-        ? 'An account already exists for that address. Use “Forgotten your password?” on the sign-in page instead.'
-        : caught.message)
-    } finally { setBusy(false) }
+    setBusy(true)
+    /* Never reports failure. Saying "no such account" here would turn the page
+       into a check for which addresses exist. */
+    await authClient.requestPasswordReset({ email, next: '/manager' })
+    setSent(email)
+    setBusy(false)
   }
 
   if (!configured) {
     return (
       <div className="container container--narrow">
         <div className="section stack" style={{ maxWidth: '26rem', marginInline: 'auto' }}>
-          <h1 className="t-h2">Staff account setup</h1>
+          <h1 className="t-h2">Set a staff password</h1>
           <p className="t-body-sm t-muted">Not available on this installation.</p>
         </div>
       </div>
@@ -71,36 +65,71 @@ export function ManagerActivatePage() {
       <div className="section stack stack--lg" style={{ maxWidth: '26rem', marginInline: 'auto' }}>
         <div className="stack">
           <p className="t-eyebrow">Motion</p>
-          <h1 className="t-h2">Staff account setup</h1>
+          <h1 className="t-h2">Set a password for email sign-in</h1>
           <p className="t-body-sm t-muted">
-            Create an email and password sign-in for your Motion staff account.
+            For a Motion staff account that currently signs in with Google. Your Google
+            sign-in keeps working — this adds email and password as a second way in.
           </p>
         </div>
 
-        {done ? (
+        {sent ? (
           <div className="state" role="status">
-            <p className="t-body">
-              We sent a confirmation link to <strong>{done}</strong>. Open it, then sign in.
-            </p>
-            <p className="t-body-sm t-muted">
-              Access is confirmed when you sign in — it is not granted by creating the account.
-            </p>
-            <Button to="/manager" variant="secondary" size="sm">Go to staff sign in</Button>
+            {verificationMethod === 'code' ? (
+              /* The flow assumes an emailed link. Rather than claim one was sent
+                 when the project issues a numeric code — with nowhere to type it
+                 — it names the mismatch and the setting to change. */
+              <p className="t-body-sm">
+                This installation is configured for verification <strong>codes</strong> rather
+                than links, which this page cannot complete. Switch the Neon Auth verification
+                method to “link”, or set <code>VITE_NEON_AUTH_VERIFICATION</code> to match.
+              </p>
+            ) : (
+              <>
+                <p className="t-body">
+                  If <strong>{sent}</strong> belongs to a Motion account, a link to set a password
+                  is on its way. Open it, choose a password, and you will come back here to sign in.
+                </p>
+                <p className="t-body-sm t-muted">
+                  Setting a password does not grant access. Access is confirmed when you sign in.
+                </p>
+                <div className="cluster">
+                  <Button to="/manager" variant="secondary" size="sm">Go to staff sign in</Button>
+                  <Button
+                    type="button"
+                    variant="text"
+                    size="sm"
+                    onClick={async () => {
+                      await authClient.requestPasswordReset({ email: sent, next: '/manager' })
+                      setResent(true)
+                    }}
+                  >
+                    Send the link again
+                  </Button>
+                </div>
+                {resent && (
+                  <p className="t-body-sm t-muted" role="status">
+                    If that address belongs to a Motion account, another link is on its way.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         ) : (
           <form className="stack" onSubmit={submit} noValidate>
-            <Field label="Your name" value={form.name} required autoComplete="name"
-              onChange={(event) => setForm({ ...form, name: event.target.value })} />
-            <Field label="Email" type="email" hint="Use your Motion staff address." value={form.email} required autoComplete="email"
-              onChange={(event) => setForm({ ...form, email: event.target.value })} />
-            <Field label="Password" type="password" hint="At least 12 characters." value={form.password} required autoComplete="new-password"
-              onChange={(event) => setForm({ ...form, password: event.target.value })} />
-            <Field label="Confirm password" type="password" value={form.confirm} required autoComplete="new-password"
-              onChange={(event) => setForm({ ...form, confirm: event.target.value })} />
-            {error && <p className="field__error" role="alert">{error}</p>}
-            <Button type="submit" variant="primary" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</Button>
+            <Field
+              label="Email"
+              type="email"
+              hint="The address you already use to sign in to Motion."
+              value={email}
+              required
+              autoComplete="email"
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <Button type="submit" variant="primary" disabled={busy}>
+              {busy ? 'Sending…' : 'Send the link'}
+            </Button>
             <p className="t-body-sm t-muted">
-              Already have one? <Link to="/manager" className="link">Sign in</Link>.
+              Back to <Link to="/manager" className="link">staff sign in</Link>.
             </p>
           </form>
         )}

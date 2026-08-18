@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { authClient, isConfigured, isGoogleEnabled } from './authClient'
 import { accountService } from '../services/accountService'
+import { env } from '../config/env'
 import { setAuthTokenProvider } from '../services/apiClient'
 
 /* Session state.
@@ -109,6 +110,8 @@ export function AuthProvider({ children }) {
     isAdmin: state.profile?.role === 'owner',
     configured: isConfigured(),
     googleEnabled: isGoogleEnabled(),
+    // 'link' or 'code'; see src/config/env.js for why it is declared not detected.
+    verificationMethod: env.authVerificationMethod,
     signIn, signUp, signInWithGoogle, signOut,
     refreshProfile: () => loadProfile(state.user),
   }), [state, signIn, signUp, signInWithGoogle, signOut, loadProfile])

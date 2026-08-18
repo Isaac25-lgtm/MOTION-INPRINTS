@@ -207,10 +207,21 @@ export const authClient = {
   },
 
   /** Response is identical whether or not the account exists. */
-  async requestPasswordReset({ email }) {
+  /* `next` is where the visitor goes after the new password is saved. Staff pass
+     '/manager' so an owner returns to the staff flow rather than the customer
+     account area. It rides in the redirect URL as a query parameter, because
+     Better Auth appends its own `token` to whatever redirectTo it is given.
+
+     This is also how a Google-only identity gains a password: the reset acts on
+     the EXISTING user rather than creating a second account, so the person ends
+     up with one identity and two ways to sign in. */
+  async requestPasswordReset({ email, next = null }) {
     const client = await requireClient()
+    const target = next
+      ? `${origin()}/reset-password?next=${encodeURIComponent(next)}`
+      : `${origin()}/reset-password`
     try {
-      await client.requestPasswordReset({ email, redirectTo: `${origin()}/reset-password` })
+      await client.requestPasswordReset({ email, redirectTo: target })
     } catch { /* deliberately swallowed — see below */ }
     /* No error is surfaced. Reporting failure here would reveal which addresses
        are registered, which is the whole thing this flow must not do. */
@@ -224,10 +235,15 @@ export const authClient = {
     return call(c => c.changePassword({ currentPassword, newPassword: password, revokeOtherSessions: true }))
   },
 
-  async resendVerification({ email }) {
+  /* `next` is where the emailed link returns to. It defaults to the customer
+     sign-in page, but staff must come back to /manager — sending an owner to the
+     public customer page after confirming their address would drop them into the
+     wrong flow with no route onward. */
+  async resendVerification({ email, next = '/sign-in?verified=1' }) {
     const client = await requireClient()
     try {
-      await client.sendVerificationEmail({ email, callbackURL: `${origin()}/sign-in?verified=1` })
-    } catch { /* same reasoning as password reset */ }
+      await client.sendVerificationEmail({ email, callbackURL: `${origin()}${next}` })
+    } catch { /* same reasoning as password reset: never reveals whether the
+                 address exists, is already verified, or is a staff one */ }
   },
 }

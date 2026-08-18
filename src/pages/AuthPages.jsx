@@ -267,6 +267,15 @@ export function ResetPasswordPage() {
      the page would show the request form again instead of the new-password
      form, and the link would appear broken. */
   const token = params.get('token')
+  /* Where to go once the password is saved. Staff arrive with next=/manager so
+     an owner returns to the staff flow rather than the customer account area.
+     Only same-site paths are honoured — a full URL here would be an open
+     redirect, letting anyone mail a "reset your password" link that lands on a
+     site they control. */
+  const requestedNext = params.get('next')
+  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/sign-in'
   const invalidLink = params.get('error') === 'INVALID_TOKEN'
   const notify = useToast()
   const [email, setEmail] = useState('')
@@ -293,8 +302,8 @@ export function ResetPasswordPage() {
     setBusy(true); setError(null)
     try {
       await authClient.resetPassword({ token, password })
-      notify('Your password has been changed.', 'success')
-      navigate('/sign-in')
+      notify('Your password has been set. Sign in with it.', 'success')
+      navigate(next)
     } catch (caught) { setError(caught.message) } finally { setBusy(false) }
   }
 

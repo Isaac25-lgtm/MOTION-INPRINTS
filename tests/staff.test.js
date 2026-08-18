@@ -308,49 +308,59 @@ describe('exactly two owners, or nobody', () => {
   })
 })
 
-describe('staff password activation', () => {
+describe('setting a password for an existing Google-only owner', () => {
   const page = async () => {
     const { readFile } = await import('node:fs/promises')
     const { fileURLToPath } = await import('node:url')
     return readFile(fileURLToPath(new URL('../src/pages/ManagerActivatePage.jsx', import.meta.url)), 'utf8')
   }
-
-  /* Comments are stripped: the file explains at length that it grants nothing,
-     and matching the word "approved" inside that explanation is not a finding.
-     `role="alert"` is an ARIA attribute, not a role being submitted. */
   const code = async () => (await page())
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*$/gm, '')
     .replace(/role="[a-z]+"/g, '')
 
-  it('creates an ordinary account and never sends a role or an owner flag', async () => {
+  /* The decisive property. Sign-up would have produced a SECOND account for a
+     person who already has one, splitting their identity, orders and access. */
+  it('uses the reset flow on the existing identity, never a second account', async () => {
     const source = await code()
-    expect(source).toContain('authClient.signUp')
+    expect(source).toContain('authClient.requestPasswordReset')
+    expect(source, 'must not create another account').not.toContain('authClient.signUp')
+    expect(source).not.toMatch(/signUp/)
+  })
 
-    // The only payload it builds is the sign-up one.
-    const start = source.indexOf('authClient.signUp')
-    const call = source.slice(start, source.indexOf(')', source.indexOf('})', start)) + 1)
-    expect(call).toContain('email')
-    expect(call).toContain('password')
-    for (const forbidden of ['role', 'isOwner', 'owner', 'staff', 'admin']) {
-      expect(call, `the sign-up payload must not carry ${forbidden}`).not.toMatch(new RegExp(`\b${forbidden}\b`, 'i'))
+  it('returns the owner to /manager after the password is set', async () => {
+    const source = await code()
+    const call = source.slice(source.indexOf('authClient.requestPasswordReset'))
+    expect(call).toMatch(/next:\s*'\/manager'/)
+    expect(call.slice(0, 120)).not.toContain('/account')
+  })
+
+  it('grants nothing and sends no role', async () => {
+    const source = await code()
+    for (const forbidden of ['role', 'isOwner', 'staffService', 'bootstrap']) {
+      expect(source, `must not send ${forbidden}`).not.toMatch(new RegExp(`\b${forbidden}\b`, 'i'))
     }
-    // It never calls the grant endpoint.
-    expect(source).not.toContain('staffService')
   })
 
-  it('cannot reveal whether an address is approved', async () => {
+  it('cannot reveal whether an address exists or is approved', async () => {
     const source = await code()
-    // The allowlist never reaches the browser, so the page has nothing to leak.
     expect(source).not.toContain('OWNER_ALLOWED_EMAILS')
-    expect(source).not.toMatch(/(approved|allowlist|not authorised)/i)
+    // The confirmation is hedged, so it is not a check for registered addresses.
+    expect(source).toMatch(/If .*belongs to a Motion account/)
+    expect(source).not.toMatch(/(approved|allowlist|not authorised|no such account)/i)
   })
 
-  it('directs the user to verify and then sign in, rather than implying access', async () => {
+  it('keeps Google working and optional', async () => {
     const source = await page()
-    expect(source).toMatch(/confirmation link/i)
-    expect(source).toMatch(/not granted by creating the account/i)
-    expect(source).toContain('/manager')
+    expect(source.replace(/\s+/g, ' ')).toMatch(/Google\s*sign-in keeps working/i)
+    const manager = await (async () => {
+      const { readFile } = await import('node:fs/promises')
+      const { fileURLToPath } = await import('node:url')
+      return readFile(fileURLToPath(new URL('../src/pages/ManagerSignInPage.jsx', import.meta.url)), 'utf8')
+    })()
+    // Google is still offered, and still behind the enabled flag.
+    expect(manager).toContain('googleEnabled &&')
+    expect(manager).toContain('signInWithGoogle')
   })
 
   it('is routed but never linked from anywhere public', async () => {
@@ -365,11 +375,90 @@ describe('staff password activation', () => {
     }
   })
 
-  /* Only the server may grant the role, wherever the account came from. */
-  it('leaves the bootstrap as the sole grant path for an activated account', async () => {
+  /* Only the server may grant the role, wherever the password came from. */
+  it('leaves the bootstrap as the sole grant path', async () => {
     const db = fakeDb({ identity: { id: 'new-user', email: 'stranger@example.com', email_verified: true } })
     const result = await body(await bootstrap(db, authAs('new-user')))
     expect(result.status).toBe(403)
     expect(insertsIn(db)).toHaveLength(0)
+  })
+
+  /* A reset link that could redirect anywhere would let anyone mail a
+     "reset your password" link landing on a site they control. */
+  it('honours only same-site return paths', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const { fileURLToPath } = await import('node:url')
+    const auth = await readFile(fileURLToPath(new URL('../src/pages/AuthPages.jsx', import.meta.url)), 'utf8')
+    const guard = auth.slice(auth.indexOf('const requestedNext'), auth.indexOf('const invalidLink'))
+    expect(guard).toMatch(/startsWith\('\/'\)/)
+    expect(guard, 'protocol-relative URLs must be rejected').toMatch(/startsWith\('\/\/'\)/)
+  })
+})
+
+describe('staff email-verification recovery', () => {
+  const readSource = async (file) => {
+    const { readFile } = await import('node:fs/promises')
+    const { fileURLToPath } = await import('node:url')
+    return readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
+  }
+  const strip = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+
+  /* A staff member who cannot confirm their address has no way forward without
+     this. Both pages told them a link had been sent and then offered nothing. */
+  it('offers a resend on the password-setup page, returning to /manager', async () => {
+    const source = strip(await readSource('../src/pages/ManagerActivatePage.jsx'))
+    expect(source).toContain('Send the link again')
+    expect(source).toContain('authClient.requestPasswordReset')
+
+    const call = source.slice(source.indexOf('authClient.requestPasswordReset'))
+    expect(call, 'resend must return to the staff flow').toMatch(/next:\s*'\/manager'/)
+    expect(call, 'resend must reuse the address just entered').toMatch(/email:\s*(sent|email)/)
+    // Never the customer sign-in page.
+    expect(call.slice(0, 140)).not.toContain('/sign-in')
+  })
+
+  it('offers a resend on the staff sign-in page when the address is unconfirmed', async () => {
+    const source = strip(await readSource('../src/pages/ManagerSignInPage.jsx'))
+    expect(source).toContain('email_not_verified')
+    expect(source).toContain('Send the link again')
+
+    const call = source.slice(source.indexOf('authClient.resendVerification'))
+    expect(call).toMatch(/next:\s*'\/manager'/)
+    // The address is the one just typed into the form.
+    expect(source).toMatch(/setUnverified\(form\.email\)/)
+    expect(call).toMatch(/email:\s*unverified/)
+  })
+
+  /* The confirmation must not become an oracle for which addresses exist, are
+     already verified, or belong to an owner. */
+  it('keeps both confirmations neutral', async () => {
+    for (const file of ['../src/pages/ManagerActivatePage.jsx', '../src/pages/ManagerSignInPage.jsx']) {
+      const source = strip(await readSource(file))
+      expect(source, `${file} must hedge the confirmation`)
+        .toMatch(/If that address (still needs confirming|belongs to a Motion account)/)
+      expect(source).not.toMatch(/(owner|approved|staff account exists|we found)/i)
+    }
+  })
+
+  /* The whole flow assumes a link. If the project issues codes there is no field
+     to type one into, so the pages must say so rather than claim a link. */
+  it('reports a configuration mismatch instead of pretending a link was sent', async () => {
+    for (const file of ['../src/pages/ManagerActivatePage.jsx', '../src/pages/ManagerSignInPage.jsx']) {
+      const source = strip(await readSource(file))
+      expect(source, `${file} must handle code mode`).toMatch(/verificationMethod === 'code'/)
+      expect(source).toMatch(/VITE_NEON_AUTH_VERIFICATION/)
+    }
+
+    const env = await readSource('../src/config/env.js')
+    // Declared, because a console setting cannot be read from the browser.
+    expect(env).toMatch(/authVerificationMethod/)
+    expect(env, 'link is the expected default').toMatch(/=== 'code' \? 'code' : 'link'/)
+  })
+
+  it('lets the caller choose where the emailed link returns to', async () => {
+    const client = strip(await readSource('../src/auth/authClient.js'))
+    const fn = client.slice(client.indexOf('async resendVerification'))
+    expect(fn).toMatch(/next = '\/sign-in\?verified=1'/)   // customer default
+    expect(fn).toMatch(/callbackURL: `\$\{origin\(\)\}\$\{next\}`/)
   })
 })

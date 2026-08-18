@@ -50,6 +50,15 @@ export const env = Object.freeze({
      hide the button rather than advertise a provider that will fail. */
   authGoogleEnabled: valueOf(import.meta.env.VITE_NEON_AUTH_GOOGLE) !== 'false',
 
+  /* Neon Auth's verification method — "link" or "code" — is a console setting
+     the browser cannot read, so it is declared here rather than guessed.
+     Everything in this app is written for a link: pages say "open the link we
+     sent" and the resend action supplies a callback URL. If the project is
+     switched to codes, that copy becomes a lie and there is no field to type a
+     code into, so the interface says so plainly instead. Default is "link",
+     matching the current project. */
+  authVerificationMethod: valueOf(import.meta.env.VITE_NEON_AUTH_VERIFICATION).toLowerCase() === 'code' ? 'code' : 'link',
+
   // Public base URL for published media. Absent means storage is not connected,
   // and the interface says so rather than showing an empty library as if it
   // were a working one.
