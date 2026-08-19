@@ -146,6 +146,46 @@ async function call(fn) {
    parameter, which would make this an open redirect. */
 const origin = () => (typeof window === 'undefined' ? '' : window.location.origin)
 
+/* A restored Neon session can already include the JWT in `session.token`.
+   Prefer it over a separate cross-origin `/token` call, while retaining the
+   endpoint as a fallback for SDK versions that do not attach it. */
+/* Pulls a JWT out of whatever shape the SDK returns — and refuses anything that
+ * is not one.
+ *
+ * The shape guard is the important half. Better Auth's `session.token` is an
+ * OPAQUE session identifier, not a JWT: verified against this project's own
+ * `neon_auth.session` rows, it is a 32-character string with no dots. Returning
+ * it would send `Authorization: Bearer <opaque>`, which `jwtVerify` rejects on
+ * the server — turning an intermittent failure into a guaranteed one, and
+ * skipping the `client.token()` fallback that would have produced a real JWT.
+ *
+ * So a candidate is accepted only if it is structurally a JWT: three
+ * dot-separated segments beginning with the base64 of `{"alg"`. That is cheap,
+ * and it means a wrong field can never masquerade as a credential.
+ *
+ * `access_token` is checked before `token` because Neon's own documentation
+ * describes the session JWT as `session.access_token`, while `token` is the
+ * opaque one.
+ */
+const looksLikeJwt = (value) =>
+  typeof value === 'string' && value.startsWith('eyJ') && value.split('.').length === 3
+
+function extractJwt(result) {
+  const candidates = [
+    typeof result === 'string' ? result : null,
+    result?.data?.session?.access_token,
+    result?.session?.access_token,
+    result?.data?.access_token,
+    result?.access_token,
+    result?.data?.session?.token,
+    result?.session?.token,
+    result?.data?.token,
+    result?.token,
+    typeof result?.data === 'string' ? result.data : null,
+  ]
+  return candidates.find(looksLikeJwt) || null
+}
+
 export const authClient = {
   isConfigured,
   isGoogleEnabled,
@@ -211,11 +251,11 @@ export const authClient = {
        * session), while `getJWTToken()` is not exposed on this client and 404s —
        * it belongs to `createInternalNeonAuth`, a different constructor.
        */
-      const result = await client.token()
-      const token = typeof result === 'string'
-        ? result
-        : result?.data?.token ?? result?.token ?? result?.data ?? null
-      return typeof token === 'string' && token.length > 0 ? token : null
+      const sessionToken = extractJwt(await client.getSession())
+      if (sessionToken) return sessionToken
+
+      // Fallback for SDK versions that do not attach a JWT to getSession().
+      return extractJwt(await client.token())
     } catch {
       /* A missing token is not an error the caller can act on: the request
          simply goes out unauthenticated and the API refuses it. Anything thrown

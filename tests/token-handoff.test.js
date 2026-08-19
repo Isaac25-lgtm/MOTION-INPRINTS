@@ -31,29 +31,82 @@ vi.mock('../src/services/apiClient.js', async (importOriginal) => await importOr
 
 beforeEach(() => { calls.length = 0 })
 
-describe('token extraction survives every plausible SDK response shape', () => {
+describe('token extraction accepts JWTs and refuses anything else', () => {
+  const JWT = 'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1c2VyLTEifQ.signature'
+
   /* Extracted from source rather than imported: authClient reads
      import.meta.env, which only exists under Vite's transform. */
   const extractor = async () => {
     const source = await readFile(projectFile('src/auth/authClient.js'), 'utf8')
-    const body = source.slice(source.indexOf('const result = await client.token()'), source.indexOf('return typeof token'))
-    return new Function('result', `${body.replace('const result = await client.token()', '')} return token`)
+    const body = source.slice(source.indexOf('const looksLikeJwt'), source.indexOf('export const authClient'))
+    return new Function(`${body}; return extractJwt`)()
   }
 
-  it('reads the token from wrapped, unwrapped and bare responses', async () => {
+  it('reads the session JWT from every documented shape', async () => {
     const extract = await extractor()
-    expect(extract({ data: { token: 'jwt-A' } })).toBe('jwt-A')   // documented shape
-    expect(extract({ token: 'jwt-B' })).toBe('jwt-B')             // unwrapped wrapper
-    expect(extract('jwt-C')).toBe('jwt-C')                        // bare string
-    expect(extract({ data: 'jwt-D' })).toBe('jwt-D')              // data is the token
+    // Neon documents the session JWT as session.access_token.
+    expect(extract({ data: { session: { access_token: JWT } } })).toBe(JWT)
+    expect(extract({ session: { access_token: JWT } })).toBe(JWT)
+    // And the shapes the /token endpoint may return.
+    expect(extract({ data: { session: { token: JWT } } })).toBe(JWT)
+    expect(extract({ session: { token: JWT } })).toBe(JWT)
+    expect(extract({ data: { token: JWT } })).toBe(JWT)
+    expect(extract({ token: JWT })).toBe(JWT)
+    expect(extract(JWT)).toBe(JWT)
+    expect(extract({ data: JWT })).toBe(JWT)
   })
 
-  it('yields nothing for an error or empty response, rather than a truthy object', async () => {
+  /* The one that matters most.
+   *
+   * Better Auth's `session.token` is an OPAQUE session identifier, not a JWT —
+   * confirmed against this project's own neon_auth.session rows, which hold
+   * 32-character strings with no dots. Returning it would send
+   * `Authorization: Bearer <opaque>`, which the server rejects on verification,
+   * and would skip the client.token() fallback that produces a real JWT. */
+  it('refuses an opaque session token so it can never be sent as a credential', async () => {
     const extract = await extractor()
-    for (const value of [{ data: null, error: { status: 401 } }, {}, null, undefined, '']) {
-      const result = extract(value)
-      expect(result == null || result === '').toBe(true)
+    const OPAQUE = 'DKbFFqw1Tz6yAbCdEfGhIjKlMnOpQrSt'   // 32 chars, no dots
+    expect(OPAQUE).toHaveLength(32)
+    expect(extract({ data: { session: { token: OPAQUE } } })).toBeNull()
+    expect(extract({ session: { token: OPAQUE } })).toBeNull()
+    expect(extract({ token: OPAQUE })).toBeNull()
+    expect(extract(OPAQUE)).toBeNull()
+  })
+
+  it('yields null for an error, empty or anonymous response', async () => {
+    const extract = await extractor()
+    for (const value of [{ data: null, error: { status: 401 } }, {}, null, undefined, '', { data: {} }]) {
+      expect(extract(value)).toBeNull()
     }
+  })
+})
+
+describe('the session JWT is preferred over a second round trip', () => {
+  const JWT = 'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1c2VyLTEifQ.signature'
+
+  /* Reading the JWT off the restored session avoids a separate cross-origin
+     request whose cookie handling is the fragile part. token() stays as the
+     fallback — it is the correct public endpoint for this SDK. */
+  it('calls getSession() before falling back to token()', async () => {
+    const source = await readFile(projectFile('src/auth/authClient.js'), 'utf8')
+    const fn = source.slice(source.indexOf('async token()'), source.indexOf('async signOut()'))
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+
+    const sessionAt = fn.indexOf('client.getSession()')
+    const tokenAt = fn.indexOf('client.token()')
+    expect(sessionAt, 'getSession must be attempted').toBeGreaterThan(-1)
+    expect(tokenAt, 'token() must remain as the fallback').toBeGreaterThan(-1)
+    expect(sessionAt, 'getSession must come first').toBeLessThan(tokenAt)
+
+    // Still the correct endpoint for this SDK.
+    expect(fn, 'getJWTToken belongs to createInternalNeonAuth and 404s here').not.toContain('getJWTToken')
+  })
+
+  it('returns early on a session JWT, and only then tries the fallback', async () => {
+    const source = await readFile(projectFile('src/auth/authClient.js'), 'utf8')
+    const fn = source.slice(source.indexOf('async token()'), source.indexOf('async signOut()'))
+    // An early return is what makes the fallback conditional rather than always run.
+    expect(fn).toMatch(/if \(sessionToken\) return sessionToken/)
   })
 })
 
@@ -144,24 +197,5 @@ describe('manager Google sign-in reaches the staff bootstrap', () => {
     expect(source).toContain('staffService.bootstrap()')
     expect(source).toMatch(/isAuthenticated && !isOwner/)
     expect(source).toContain("signInWithGoogle({ next: '/manager' })")
-  })
-})
-
-describe('the token method matches the installed SDK', () => {
-  /* Verified against @neondatabase/neon-js 0.7.0-beta: `client.token()` is the
-     real endpoint — it answers 401 without a session — while `getJWTToken()` is
-     not exposed on a client from `createAuthClient` and 404s. It belongs to
-     `createInternalNeonAuth`, a different constructor. The client is a Proxy, so
-     `typeof client.anything === 'function'` and cannot be used to tell them
-     apart; only calling them can. */
-  it('calls token(), not a method this client does not expose', async () => {
-    const source = await readFile(projectFile('src/auth/authClient.js'), 'utf8')
-    const fn = source.slice(source.indexOf('async token()'), source.indexOf('async signOut()'))
-      // Comments stripped: the block explains why getJWTToken is wrong, and
-      // matching that explanation is not a finding.
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/.*$/gm, '')
-    expect(fn).toContain('client.token()')
-    expect(fn, 'getJWTToken belongs to createInternalNeonAuth and 404s here').not.toContain('getJWTToken')
   })
 })
