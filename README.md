@@ -11,7 +11,8 @@ npm run build
 npm test
 
 # Applies db/migrations/*.sql in order; needs DATABASE_URL in the environment.
-# Against Supabase, use the direct (non-pooled) URI — see SUPABASE.md.
+# Direct :5432 when IPv6 works; Session Pooler :5432 on IPv4-only networks.
+# Never Transaction Pooler :6543. See SUPABASE.md.
 node --env-file=.env.supabase db/migrate.js --dry-run
 node --env-file=.env.supabase db/migrate.js
 ```

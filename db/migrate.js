@@ -6,10 +6,12 @@
    was applied — an edited migration is a different migration, and silently
    re-applying or skipping it is how environments drift apart.
 
-   Uses node-postgres over standard TCP. Advisory locks require a DIRECT
-   (non-pooled) connection: PgBouncer transaction pooling (Supabase port 6543,
-   hostname pooler.supabase.com) will not hold them. Rehearse against Supabase
-   with the direct URI in `.env.supabase` — see SUPABASE.md.
+   Uses one node-postgres Client over standard TCP and holds
+   pg_advisory_lock for the whole run. Direct (db.<project-ref>.supabase.co:5432)
+   is preferred when IPv6 works. Session Pooler (*.pooler.supabase.com:5432) is
+   the supported IPv4 fallback: session mode assigns one backend connection to
+   this client, so the lock is retained. Transaction Pooler port 6543 must
+   never be used — it cannot hold the lock. See SUPABASE.md.
 
    Usage:  node --env-file=.env.supabase db/migrate.js [--dry-run]
            node --env-file=.env db/migrate.js [--dry-run]
@@ -20,6 +22,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import pg from 'pg'
 import { sslFor } from '../server/db.js'
+import { assertMigrationConnection } from './migration-connection.js'
 
 const MIGRATIONS_DIR = new URL('./migrations/', import.meta.url)
 const dryRun = process.argv.includes('--dry-run')
@@ -36,22 +39,6 @@ function describe(connectionString) {
   }
 }
 
-function assertDirectConnection(connectionString) {
-  try {
-    const url = new URL(connectionString)
-    const pooled = url.hostname.includes('pooler.supabase.com') || url.port === '6543'
-    if (pooled) {
-      console.error('DATABASE_URL points at the Supabase pooler.')
-      console.error('Migrations take an advisory lock and must use the DIRECT connection')
-      console.error('(db.<project-ref>.supabase.co, port 5432), not the pooler.')
-      console.error('See SUPABASE.md.')
-      process.exit(1)
-    }
-  } catch {
-    /* URL parse failed — connect() will fail with a clearer error. */
-  }
-}
-
 async function main() {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
@@ -59,7 +46,7 @@ async function main() {
     process.exit(1)
   }
 
-  assertDirectConnection(databaseUrl)
+  assertMigrationConnection(databaseUrl)
 
   const client = new pg.Client({
     connectionString: databaseUrl,
@@ -138,4 +125,9 @@ async function main() {
   else console.log(`\n  applied ${pending} migration(s)`)
 }
 
-main().catch(error => { console.error(error.message); process.exit(1) })
+/* Started only when run directly, so tests can import the connection guard
+   without this file connecting to Postgres as a side effect. */
+const isEntryPoint = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
+if (isEntryPoint) {
+  main().catch(error => { console.error(error.message); process.exit(1) })
+}

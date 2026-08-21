@@ -1,6 +1,6 @@
 # Environment configuration
 
-Copy `.env.example` to `.env` for local development. For Supabase rehearsals, copy it to `.env.supabase` and point `DATABASE_URL` at the **direct** connection (see `SUPABASE.md`). Both files are ignored by Git. Vite can only expose variables beginning with `VITE_`; do not add secret values with that prefix.
+Copy `.env.example` to `.env` for local development. For Supabase rehearsals, copy it to `.env.supabase` and point `DATABASE_URL` at **Direct** (`db.<ref>.supabase.co:5432`) when IPv6 works, or the **Session Pooler** (`*.pooler.supabase.com:5432`) on IPv4-only networks. Never port 6543. See `SUPABASE.md`. Both files are ignored by Git. Vite can only expose variables beginning with `VITE_`; do not add secret values with that prefix.
 
 | Variable | Purpose | Exposure | Local configuration | Production configuration |
 | --- | --- | --- | --- | --- |
@@ -11,7 +11,7 @@ Copy `.env.example` to `.env` for local development. For Supabase rehearsals, co
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable (anon) key | **Public** | `.env` | Render Static Site |
 | `VITE_SUPABASE_GOOGLE` | Set to `false` to hide "Continue with Google". Anything else (or unset) shows it. | **Public** | `.env` (may be blank) | Render Static Site |
 | `VITE_STORAGE_PUBLIC_BASE_URL` | Optional override for public catalogue images. Blank derives `{VITE_SUPABASE_URL}/storage/v1/object/public/motion-public` | **Public** | `.env` (may be blank) | Render Static Site (optional) |
-| `DATABASE_URL` | Postgres connection string | Server-only | API runtime `.env` — direct URI for migrations, session pooler for the API | `motion-api` only |
+| `DATABASE_URL` | Postgres connection string | Server-only | API runtime `.env` — Direct `:5432` when IPv6 works; Session Pooler `:5432` on IPv4-only networks (migrations and persistent API). Never Transaction Pooler `:6543`. | `motion-api` only — Session Pooler `:5432` |
 | `SUPABASE_URL` | Same public origin as `VITE_SUPABASE_URL` | Server-only (not secret) | API runtime `.env` | `motion-api` only |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role JWT | **SECRET** | API runtime `.env` | `motion-api` only |
 | `OWNER_ALLOWED_EMAILS` | Exactly two owner addresses | **SECRET-ish, server-only** | API runtime `.env` | `motion-api` only |

@@ -81,7 +81,7 @@ If Render later documents a header it overwrites, set `API_TRUSTED_CLIENT_HEADER
 
 ### Before real API calls work
 
-1. **Apply the migrations to the Supabase project.** They are never run on deploy — a deploy that silently alters a schema is how a production database gets changed by accident. Use the **direct** connection string (not the pooler). See `SUPABASE.md`.
+1. **Apply the migrations to the Supabase project.** They are never run on deploy — a deploy that silently alters a schema is how a production database gets changed by accident. Prefer the **Direct** connection when IPv6 works; on IPv4-only networks use the **Session Pooler** (port **5432**). Never the Transaction Pooler (port **6543**). See `SUPABASE.md`.
 2. **Add the frontend's Render URL to Supabase Auth redirect URLs** once Render has created it. Sign-in fails until you do.
 3. **Do not change live Render variables or deploy as part of a code-only migration.** Swap DATABASE_URL and Auth variables in a later, deliberate cutover.
 
@@ -101,4 +101,4 @@ The in-memory limiter is per instance. A runtime that scales to several instance
 
 ## Database migrations
 
-Apply `db/migrations` in filename order to the intended Supabase project using a controlled migration process, then promote tested changes. Do not edit an applied migration; create a new numbered migration. Use a **direct, non-pooled** connection: advisory locks do not work through the transaction pooler. Rehearsal commands are in `SUPABASE.md`.
+Apply `db/migrations` in filename order to the intended Supabase project using a controlled migration process, then promote tested changes. Do not edit an applied migration; create a new numbered migration. The runner uses one `pg.Client` and an advisory lock. Direct (`db.<ref>.supabase.co:5432`) is preferred when IPv6 works; Session Pooler port **5432** is the supported IPv4 fallback. Transaction Pooler port **6543** must never be used for the migration runner. Rehearsal commands are in `SUPABASE.md`.

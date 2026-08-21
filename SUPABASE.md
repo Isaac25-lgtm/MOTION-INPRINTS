@@ -12,10 +12,11 @@ Supabase issues more than one URI. Using the wrong one is the usual failure.
 
 | Use | Which URI | How to recognise it |
 | --- | --- | --- |
-| **Migrations** (`db/migrate.js`) | **Direct** connection | Host `db.<project-ref>.supabase.co`, port **5432**. Needed for `pg_advisory_lock`. |
-| **Render API** (`DATABASE_URL` on `motion-api`) | **Session pooler** | Host `*.pooler.supabase.com`, port **5432** (not 6543). Long-lived `pg.Pool`. |
+| **Migrations** (`db/migrate.js`) — preferred | **Direct** | Host `db.<project-ref>.supabase.co`, port **5432**. Use this when IPv6 works. |
+| **Migrations** and **persistent Node API** — IPv4 fallback | **Session Pooler** | Host `*.pooler.supabase.com`, port **exactly 5432**. Session mode gives the single `pg.Client` (migrations) or long-lived `pg.Pool` (API) an exclusive backend connection, so `pg_advisory_lock` is retained. |
+| Never | **Transaction Pooler** | Port **6543**. Cannot hold advisory locks and fights `pg` prepared statements. The migration runner refuses it. |
 
-Transaction pooling (port **6543**) is not used. It cannot hold advisory locks and fights `pg` prepared statements.
+Direct is preferred when IPv6 works. Many IPv4-only networks (including typical Windows home ISPs) cannot reach the Direct host. Session Pooler port 5432 is the supported fallback for both migrations and the API.
 
 Dashboard → Project Settings → Database → Connection string. Enable `sslmode=require`.
 
@@ -26,7 +27,7 @@ Never commit a connection string, a service_role key, or a `.env.supabase` file.
 Create `.env.supabase` locally (gitignored) from `.env.example`:
 
 ```
-DATABASE_URL=<direct URI, sslmode=require>
+DATABASE_URL=<Direct URI when IPv6 works, or Session Pooler :5432 on IPv4-only networks; sslmode=require>
 SUPABASE_URL=https://qkgmymeiszcznzplcgtc.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<service_role JWT>
 OWNER_ALLOWED_EMAILS=<two distinct addresses>
@@ -46,7 +47,7 @@ node --env-file=.env.supabase db/migrate.js
 
 `--dry-run` lists pending files and writes nothing. The apply step creates the Motion schema (migrations 0001–0014) on the empty project. It does **not** copy Neon data. There is no customer, product, order, quote or payment seed.
 
-The runner refuses a pooler URL rather than hanging on the advisory lock.
+The runner refuses Transaction Pooler port **6543**. Direct and Session Pooler port **5432** are accepted.
 
 Local API against that database:
 
