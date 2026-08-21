@@ -33,36 +33,25 @@ export const env = Object.freeze({
   appUrl: valueOf(import.meta.env.VITE_APP_URL),
   apiBaseUrl: normaliseApiBaseUrl(valueOf(import.meta.env.VITE_API_BASE_URL)),
 
-  /* Neon Auth (Managed Better Auth) base URL — the only auth value the browser
-     needs, and deliberately public.
-   *
-   * The previous integration additionally demanded a project id and a
-   * publishable key and spoke the Stack Auth REST protocol. Neon Auth is now
-   * Better Auth: the base URL alone identifies the instance, the session lives
-   * in an HTTP-only cookie the SDK manages, and there is no publishable key to
-   * hold. Those two variables are gone rather than left blank, so nobody tries
-   * to populate them. */
-  authBaseUrl: valueOf(import.meta.env.VITE_NEON_AUTH_URL),
+  /* Supabase project origin. Public. Paired with the publishable key; together
+     they identify the Auth project to the browser. The service_role key must
+     never be given a VITE_ name. */
+  supabaseUrl: valueOf(import.meta.env.VITE_SUPABASE_URL),
+  supabasePublishableKey: valueOf(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
 
   /* Whether Google is offered alongside email. Google is enabled per-project in
-     the Neon console, which the browser cannot detect, so it is declared here.
-     Default is on, matching the current project configuration. Set to "false" to
-     hide the button rather than advertise a provider that will fail. */
-  authGoogleEnabled: valueOf(import.meta.env.VITE_NEON_AUTH_GOOGLE) !== 'false',
+     the Supabase dashboard, which the browser cannot detect, so it is declared
+     here. Default is on. Set to "false" to hide the button rather than
+     advertise a provider that will fail. */
+  authGoogleEnabled: valueOf(import.meta.env.VITE_SUPABASE_GOOGLE) !== 'false',
 
-  /* Neon Auth's verification method — "link" or "code" — is a console setting
-     the browser cannot read, so it is declared here rather than guessed.
-     Everything in this app is written for a link: pages say "open the link we
-     sent" and the resend action supplies a callback URL. If the project is
-     switched to codes, that copy becomes a lie and there is no field to type a
-     code into, so the interface says so plainly instead. Default is "link",
-     matching the current project. */
-  authVerificationMethod: valueOf(import.meta.env.VITE_NEON_AUTH_VERIFICATION).toLowerCase() === 'code' ? 'code' : 'link',
-
-  // Public base URL for published media. Absent means storage is not connected,
-  // and the interface says so rather than showing an empty library as if it
-  // were a working one.
-  storagePublicBaseUrl: valueOf(import.meta.env.VITE_STORAGE_PUBLIC_BASE_URL),
+  /* Public catalogue images. Derived from the Supabase URL so a separate
+     storage variable is not required; override with VITE_STORAGE_PUBLIC_BASE_URL
+     if the public bucket is ever mounted elsewhere. */
+  storagePublicBaseUrl: valueOf(import.meta.env.VITE_STORAGE_PUBLIC_BASE_URL)
+    || (valueOf(import.meta.env.VITE_SUPABASE_URL)
+      ? `${valueOf(import.meta.env.VITE_SUPABASE_URL).replace(/\/+$/, '')}/storage/v1/object/public/motion-public`
+      : ''),
 })
 
 export function assertRuntimeConfig() {
@@ -71,29 +60,37 @@ export function assertRuntimeConfig() {
     throw new Error('Production VITE_API_BASE_URL must be an absolute secure API URL.')
   }
 
-  /* Auth is all-or-nothing, but "all" is now a single value. When it is absent
-     the sign-in pages say accounts are switched off rather than rendering a form
-     that cannot succeed. */
-  if (env.authBaseUrl) {
+  /* Auth is all-or-nothing: both the URL and the publishable key, or neither.
+     When they are absent the sign-in pages say accounts are switched off rather
+     than rendering a form that cannot succeed. */
+  const authPartial = Boolean(env.supabaseUrl) !== Boolean(env.supabasePublishableKey)
+  if (authPartial) {
+    throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be set together.')
+  }
+
+  if (env.supabaseUrl) {
     let parsed
-    try { parsed = new URL(env.authBaseUrl) } catch {
-      throw new Error('VITE_NEON_AUTH_URL must be an absolute URL, for example https://<endpoint>.neonauth.<region>.aws.neon.tech/neondb/auth')
+    try { parsed = new URL(env.supabaseUrl) } catch {
+      throw new Error('VITE_SUPABASE_URL must be an absolute URL, for example https://<project-ref>.supabase.co')
     }
     if (import.meta.env.PROD && parsed.protocol !== 'https:') {
-      throw new Error('VITE_NEON_AUTH_URL must use https in production.')
+      throw new Error('VITE_SUPABASE_URL must use https in production.')
     }
-    /* Catches the obsolete Stack-style value being pasted in. The Better Auth
-       base URL ends in the database path, not a bare origin. */
-    if (parsed.pathname === '/' || parsed.pathname === '') {
-      throw new Error('VITE_NEON_AUTH_URL looks incomplete: it should include the auth path, for example https://<endpoint>.neonauth.<region>.aws.neon.tech/neondb/auth')
+    if (parsed.pathname !== '/' && parsed.pathname !== '') {
+      throw new Error('VITE_SUPABASE_URL must be the project origin with no path, for example https://<project-ref>.supabase.co')
     }
   }
 
-  /* Fail loudly if the removed Stack variables are still set, rather than
-     ignoring them and leaving someone to wonder why their key does nothing. */
-  const obsolete = ['VITE_NEON_AUTH_PROJECT_ID', 'VITE_NEON_AUTH_PUBLISHABLE_KEY']
-    .filter(name => valueOf(import.meta.env[name]))
+  /* Fail loudly if removed Neon variables are still set, rather than ignoring
+     them and leaving someone to wonder why sign-in does nothing. */
+  const obsolete = [
+    'VITE_NEON_AUTH_URL',
+    'VITE_NEON_AUTH_GOOGLE',
+    'VITE_NEON_AUTH_VERIFICATION',
+    'VITE_NEON_AUTH_PROJECT_ID',
+    'VITE_NEON_AUTH_PUBLISHABLE_KEY',
+  ].filter(name => valueOf(import.meta.env[name]))
   if (obsolete.length) {
-    throw new Error(`${obsolete.join(' and ')} are obsolete. Neon Auth now uses Better Auth, which needs only VITE_NEON_AUTH_URL. Remove them from your environment.`)
+    throw new Error(`${obsolete.join(' and ')} are obsolete. Motion now uses Supabase Auth. Set VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY and VITE_SUPABASE_GOOGLE instead.`)
   }
 }

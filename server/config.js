@@ -1,36 +1,46 @@
-const required = ['DATABASE_URL', 'NEON_AUTH_JWKS_URL', 'NEON_AUTH_ISSUER']
+const required = ['DATABASE_URL', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
 
-/* Validates the two Neon Auth values together.
+/* Validates the server-side Supabase pair.
  *
- * The issuer is the ORIGIN of the Neon Auth URL, while the JWKS lives under its
- * full path — for `https://ep-x.neonauth.../neondb/auth` the issuer is
- * `https://ep-x.neonauth...` and the JWKS is
- * `https://ep-x.neonauth.../neondb/auth/.well-known/jwks.json`.
+ * SUPABASE_URL is the project origin (https://<ref>.supabase.co). The service
+ * role key is a JWT whose `role` claim is `service_role`. Pasting the
+ * publishable (anon) key here is the likely mistake: the API would start, auth
+ * calls would behave oddly, and the key would still be a secret in the wrong
+ * slot. Caught at boot rather than in production traffic.
  *
- * The easy mistake is pasting the same value into both, or giving the issuer a
- * trailing path. Either produces tokens that verify cryptographically and are
- * then rejected on the issuer claim, which reads like a broken login rather than
- * a configuration error. Caught here instead, at startup. */
-function validateAuth(jwksUrl, issuer) {
-  let jwks, iss
-  try { jwks = new URL(jwksUrl) } catch { throw new Error('NEON_AUTH_JWKS_URL must be an absolute URL ending in /.well-known/jwks.json') }
-  try { iss = new URL(issuer) } catch { throw new Error('NEON_AUTH_ISSUER must be an absolute URL, and is the ORIGIN of your Neon Auth URL with no path.') }
+ * The check only reads the JWT payload. It does not verify the signature —
+ * that is Supabase's job when the key is used. */
+function decodeJwtPayload(token) {
+  const parts = String(token || '').split('.')
+  if (parts.length !== 3) return null
+  try {
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+  } catch {
+    return null
+  }
+}
 
-  if (!jwks.pathname.endsWith('/.well-known/jwks.json')) {
-    throw new Error('NEON_AUTH_JWKS_URL must end in /.well-known/jwks.json')
+function validateSupabase(url, serviceRoleKey) {
+  let parsed
+  try { parsed = new URL(url) } catch {
+    throw new Error('SUPABASE_URL must be an absolute URL, for example https://<project-ref>.supabase.co')
   }
-  if (iss.pathname !== '/' && iss.pathname !== '') {
-    throw new Error(`NEON_AUTH_ISSUER must be an origin with no path. Expected "${iss.origin}", got "${issuer}".`)
+  if (parsed.pathname !== '/' && parsed.pathname !== '') {
+    throw new Error(`SUPABASE_URL must be the project origin with no path. Expected "${parsed.origin}", got "${url}".`)
   }
-  if (jwks.origin !== iss.origin) {
-    throw new Error(`NEON_AUTH_ISSUER (${iss.origin}) and NEON_AUTH_JWKS_URL (${jwks.origin}) must share an origin.`)
+  const payload = decodeJwtPayload(serviceRoleKey)
+  if (!payload) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY must be the service_role JWT from Supabase Settings → API.')
+  }
+  if (payload.role !== 'service_role') {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not the service_role key. The publishable/anon key belongs only in VITE_SUPABASE_PUBLISHABLE_KEY.')
   }
 }
 
 export function serverConfig(source = process.env) {
   const missing = required.filter(name => !source[name])
   if (missing.length) throw new Error(`Missing required server environment variables: ${missing.join(', ')}`)
-  validateAuth(source.NEON_AUTH_JWKS_URL, source.NEON_AUTH_ISSUER)
+  validateSupabase(source.SUPABASE_URL, source.SUPABASE_SERVICE_ROLE_KEY)
   /* Rate-limit identity for anonymous callers.
    *
    * This must name a header the runtime OVERWRITES. A header the runtime merely
@@ -92,10 +102,14 @@ export function serverConfig(source = process.env) {
 
   const ownerAllowedEmails = ownersConfigured ? suppliedOwners : []
 
+  const supabaseUrl = source.SUPABASE_URL.replace(/\/+$/, '')
+  const publicStorage = (source.OBJECT_STORAGE_PUBLIC_BASE_URL || '').trim()
+    || `${supabaseUrl}/storage/v1/object/public/motion-public`
+
   return Object.freeze({
     databaseUrl: source.DATABASE_URL,
-    authJwksUrl: source.NEON_AUTH_JWKS_URL,
-    authIssuer: source.NEON_AUTH_ISSUER,
+    supabaseUrl,
+    supabaseServiceRoleKey: source.SUPABASE_SERVICE_ROLE_KEY,
     allowedOrigins: (source.API_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean),
     timeoutMs: Number(source.API_REQUEST_TIMEOUT_MS || 10000),
     trustedClientHeader: trustedClientHeader || null,
@@ -104,6 +118,6 @@ export function serverConfig(source = process.env) {
     // without revealing either to the caller.
     ownersConfigured,
     rateLimit: { windowMs: Number(source.API_RATE_LIMIT_WINDOW_MS || 60000), max: Number(source.API_RATE_LIMIT_MAX_REQUESTS || 100), maxKeys: Number(source.API_RATE_LIMIT_MAX_KEYS || 10000) },
-    storage: { endpoint: source.OBJECT_STORAGE_ENDPOINT, bucket: source.OBJECT_STORAGE_BUCKET, publicBaseUrl: source.OBJECT_STORAGE_PUBLIC_BASE_URL },
+    storage: { publicBaseUrl: publicStorage },
   })
 }

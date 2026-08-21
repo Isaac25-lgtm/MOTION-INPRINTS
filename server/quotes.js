@@ -163,8 +163,8 @@ export async function createQuote(db, { quoteRequestId, items, taxRateBp, validU
      without its line items would be a priced document with nothing priced, so
      partial creation is not an acceptable outcome.
 
-     Ids are generated here because Neon's transaction API is non-interactive:
-     every statement must exist before the first one runs. */
+     Ids are generated here so the whole batch can be submitted without waiting
+     for a database-assigned id between statements. */
   await db.transaction((tx) => {
     const queries = []
     if (previous) {

@@ -337,13 +337,11 @@ export function AccountReorderPage() {
 
 /* Profile — onboarding and editing, which are two different jobs.
  *
- * A newly authenticated customer has a Neon Auth identity but no Motion profile
+ * A newly authenticated customer has an Auth identity but no Motion profile
  * row, and the route guard sends them here to create one. `GET /me` answers 403
  * `profile_required` for exactly that person. Treating it as a fetch failure —
  * which is what this page used to do — showed a dead error with a Retry button
- * that could only produce the same 403 again. That blocked every new customer,
- * and with them the owner bootstrap, since the promotion script needs a profile
- * row to exist before it will do anything.
+ * that could only produce the same 403 again. That blocked every new customer.
  *
  * A missing profile is an expected onboarding state, not an error. The two are
  * now distinguished, and the form posts or patches accordingly.
@@ -364,7 +362,7 @@ export function AccountProfilePage() {
   const creating = missingProfile && !state.data
 
   const blank = {
-    /* Prefilled from the Neon Auth identity when it carries a name — a Google
+    /* Prefilled from the Auth identity when it carries a name — a Google
        sign-in usually does, an email sign-up carries whatever was typed. It is a
        convenience only: the field stays editable and nothing depends on it. */
     fullName: user?.name || '',

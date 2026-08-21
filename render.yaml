@@ -10,16 +10,17 @@
 # origin. `envVarKey` reads the service's own RENDER_EXTERNAL_URL, which is the
 # public https:// URL.
 #
-# No database is declared: Postgres and auth are Neon's. No migration runs on
-# deploy — a deploy that silently alters a schema is how a production database
-# gets changed by accident.
+# No database is declared: Postgres and auth are Supabase's. No migration runs
+# on deploy — a deploy that silently alters a schema is how a production
+# database gets changed by accident. Apply db/migrations from a controlled
+# machine; see SUPABASE.md.
 #
 # No secret appears in this file. `sync: false` declares a variable without a
 # value so Render prompts at import; the value is entered in the dashboard.
 services:
   # ── Secure API ─────────────────────────────────────────────────────────────
   # `server/render.js` — a thin Node bridge around the Fetch-style handler in
-  # server/index.js. DATABASE_URL and the auth configuration live here and
+  # server/index.js. DATABASE_URL and the service_role key live here and
   # nowhere else; the static site ships every one of its variables to the
   # browser, so a secret there is a published secret.
   - type: web
@@ -33,17 +34,17 @@ services:
       - key: NODE_ENV
         value: production
 
-      # SECRET. Paste from Neon privately. Never in the frontend service, never
-      # in a VITE_ variable, never in the repository.
+      # SECRET. Supabase session-pooler URI (port 5432), sslmode=require.
+      # Never in the frontend service, never in a VITE_ variable, never in Git.
       - key: DATABASE_URL
         sync: false
 
-      # Public values, but server-side — the browser has no use for them.
-      # JWKS is the auth URL plus /.well-known/jwks.json; ISSUER is its ORIGIN
-      # with no path. serverConfig() refuses to start if they are swapped.
-      - key: NEON_AUTH_JWKS_URL
+      # Public origin, but server-side — the browser has its own VITE_ copy.
+      - key: SUPABASE_URL
         sync: false
-      - key: NEON_AUTH_ISSUER
+
+      # SECRET. service_role JWT from Supabase Settings → API. API only.
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
 
       # CORS, sourced from the frontend so the allowed origin is exactly the
@@ -60,7 +61,7 @@ services:
       # site: every variable there ships to the browser, and publishing the
       # owners' addresses invites targeted phishing at the only accounts that
       # matter. An address here is not a credential — it grants nothing without a
-      # verified Neon Auth session for that same address.
+      # confirmed Supabase Auth session for that same address.
       # Empty approves nobody, which is the safe failure.
       - key: OWNER_ALLOWED_EMAILS
         sync: false
@@ -100,16 +101,13 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
 
-      # Public. The full Neon Auth URL, including the /neondb/auth path.
-      - key: VITE_NEON_AUTH_URL
+      # Public. The Supabase project origin, no path.
+      - key: VITE_SUPABASE_URL
         sync: false
-      # Public. "link" (default) or "code", matching the Neon console setting.
-      # The browser cannot detect it, so it is declared; the staff pages report a
-      # mismatch rather than claiming a link was sent.
-      - key: VITE_NEON_AUTH_VERIFICATION
+      # Public. The publishable (anon) key. Never the service_role key.
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
         sync: false
-
       # Public. `true` shows the Google button; only the exact string `false`
       # hides it. Email and password sign-in is available either way.
-      - key: VITE_NEON_AUTH_GOOGLE
+      - key: VITE_SUPABASE_GOOGLE
         sync: false

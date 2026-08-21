@@ -94,9 +94,8 @@ export async function priceCart(db, items) {
  * back, so the database can never hold an order missing its items, nor an order
  * whose idempotency key went unrecorded.
  *
- * Neon's transaction API is non-interactive — every statement must be built
- * before any runs — so identifiers are generated here rather than by the database.
- * That is what makes a single round-trip transaction possible at all.
+ * Identifiers are generated here rather than by the database so the order row,
+ * items, history and idempotency record can be submitted as one batch.
  */
 export async function createOrder(db, {
   items, contact, fulfilment, deliveryAmount = 0, taxAmount = 0, notes = null,

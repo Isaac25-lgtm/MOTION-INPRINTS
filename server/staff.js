@@ -1,10 +1,10 @@
 import { ApiError } from './http.js'
 import { requireAuth, resolveVerifiedIdentity, isApprovedOwnerEmail } from './auth.js'
 
-/* Staff bootstrap: turns a verified Neon Auth session into an owner profile.
+/* Staff bootstrap: turns a verified Supabase Auth session into an owner profile.
  *
- * The problem it solves: Neon Auth and Motion keep separate records. Signing in
- * with Google creates a Neon Auth identity but no `user_profiles` row, and the
+ * The problem it solves: Supabase Auth and Motion keep separate records. Signing
+ * in with Google creates a Supabase identity but no `user_profiles` row, and the
  * ordinary onboarding form only ever writes `customer`. So an approved owner
  * could authenticate perfectly and still be unable to reach the dashboard, with
  * no path that would ever grant it.
@@ -12,9 +12,10 @@ import { requireAuth, resolveVerifiedIdentity, isApprovedOwnerEmail } from './au
  * The rules this enforces, in order:
  *
  *   1. A cryptographically verified session, or nothing happens.
- *   2. The email is resolved SERVER-SIDE from `neon_auth.user` using the token's
- *      subject — never taken from the request body, never from a token claim.
- *   3. The address must be verified AND on the server-only allowlist.
+ *   2. The email is resolved SERVER-SIDE from Supabase Auth's `getUser` result
+ *      — never taken from the request body, never from a token claim parsed
+ *      here.
+ *   3. The address must be confirmed AND on the server-only allowlist.
  *   4. Only then is a profile created or upgraded to `owner`.
  *
  * A caller who is not approved gets a neutral refusal. It does not say whether
@@ -58,7 +59,7 @@ export async function staffBootstrap(request, db, authenticate, options = {}) {
     throw new ApiError(503, 'staff_configuration_unavailable', 'Staff access is not available on this installation.')
   }
 
-  const identity = await resolveVerifiedIdentity(db, actor.authUserId)
+  const identity = resolveVerifiedIdentity(actor)
   const approved = identity && isApprovedOwnerEmail(identity.email, ownerAllowedEmails)
 
   if (!approved) {

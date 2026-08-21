@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 /* First-profile onboarding.
  *
- * The defect this covers: a newly authenticated customer has a Neon Auth
+ * The defect this covers: a newly authenticated customer has an Auth
  * identity but no `public.user_profiles` row. The route guard sends them to
  * /account/profile, `GET /me` answers 403 `profile_required`, and the page
  * rendered a dead error with a Retry button that could only produce the same 403.
@@ -112,7 +112,7 @@ describe('first profile after sign-up', () => {
     expect(container.textContent).toContain('Save and continue')
   })
 
-  it('prefills the name from the Neon Auth identity without requiring one', async () => {
+  it('prefills the name from the Auth identity without requiring one', async () => {
     const withName = await mount()
     expect(field(withName.container, 'Full name').value).toBe('Amina Nakato')
 

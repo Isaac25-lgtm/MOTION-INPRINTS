@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Field } from '../components/ui/Form'
@@ -7,7 +7,7 @@ import { useToast } from '../components/ToastProvider'
 import { useAuth } from '../auth/AuthProvider'
 import { authClient } from '../auth/authClient'
 
-/* Sign-in, sign-up and password reset against Neon Auth (Managed Better Auth).
+/* Sign-in, sign-up and password reset against Supabase Auth.
  *
  * Two equal ways in: Google, or an email address and a password. Email is a
  * first-class method, not a fallback — any working address is fine (Outlook,
@@ -239,7 +239,7 @@ export function SignUpPage() {
       <GoogleChoice label="or create an account with email" next="/account/profile" onError={setError} />
 
       <form className="stack" onSubmit={submit} noValidate>
-        {/* Name is collected here only because Neon Auth accepts one at sign-up.
+        {/* Name is collected here only because Auth accepts one at sign-up.
             Company and phone are profile fields, gathered after authentication. */}
         <Field label="Your name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required autoComplete="name" />
         <Field
@@ -262,11 +262,11 @@ export function SignUpPage() {
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams()
-  /* Better Auth returns the reset credential as `token`. The previous
-     integration read `code`, which is Stack's name for it — with that mismatch
-     the page would show the request form again instead of the new-password
-     form, and the link would appear broken. */
+  /* Recovery arrives as a PKCE `code`, a `type=recovery` flag, or (older links)
+     a `token`. Any of these means the visitor came from the emailed link and
+     should see the new-password form. */
   const token = params.get('token')
+  const recoveryHint = Boolean(token || params.get('code') || params.get('type') === 'recovery')
   /* Where to go once the password is saved. Staff arrive with next=/manager so
      an owner returns to the staff flow rather than the customer account area.
      Only same-site paths are honoured — a full URL here would be an open
@@ -284,7 +284,26 @@ export function ResetPasswordPage() {
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
+  const [recovery, setRecovery] = useState(recoveryHint)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (recoveryHint) {
+      setRecovery(true)
+      return undefined
+    }
+    if (typeof window === 'undefined') return undefined
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (hash.get('type') === 'recovery' || hash.get('access_token')) {
+      setRecovery(true)
+      return undefined
+    }
+    let active = true
+    authClient.getSession().then((session) => {
+      if (active && session && hash.get('type') === 'recovery') setRecovery(true)
+    }).catch(() => {})
+    return () => { active = false }
+  }, [recoveryHint])
 
   const requestReset = async (event) => {
     event.preventDefault()
@@ -301,7 +320,8 @@ export function ResetPasswordPage() {
     if (password.length < 8) { setError('Use at least 8 characters.'); return }
     setBusy(true); setError(null)
     try {
-      await authClient.resetPassword({ token, password })
+      await authClient.resetPassword({ password })
+      await authClient.signOut()
       notify('Your password has been set. Sign in with it.', 'success')
       navigate(next)
     } catch (caught) { setError(caught.message) } finally { setBusy(false) }
@@ -309,8 +329,8 @@ export function ResetPasswordPage() {
 
   return (
     <AuthShell
-      title={token ? 'Choose a new password' : 'Reset your password'}
-      intro={token ? 'Enter the new password for your account.' : 'We will email you a link to set a new password.'}
+      title={recovery ? 'Choose a new password' : 'Reset your password'}
+      intro={recovery ? 'Enter the new password for your account.' : 'We will email you a link to set a new password.'}
       footer={<p className="t-body-sm t-muted"><Link to="/sign-in" className="link">Back to sign in</Link></p>}
     >
       {invalidLink && (
@@ -318,7 +338,7 @@ export function ResetPasswordPage() {
           That reset link has expired or has already been used. Request a new one below.
         </p>
       )}
-      {token ? (
+      {recovery ? (
         <form className="stack" onSubmit={applyReset} noValidate>
           <Field label="New password" type="password" hint="At least 8 characters." value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="new-password" />
           <Field label="Confirm new password" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required autoComplete="new-password" />

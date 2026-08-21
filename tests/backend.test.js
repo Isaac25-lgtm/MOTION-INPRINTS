@@ -8,6 +8,7 @@ import { productSchema, quoteRequestSchema, validate } from '../server/validatio
 import { createClientKeyResolver, createMemoryRateLimiter } from '../server/handler.js'
 import { createDatabaseClient } from '../server/db.js'
 import { serverConfig } from '../server/config.js'
+import { serverEnv } from './helpers/supabase.js'
 
 const silentLogger = { info() {}, error() {} }
 const request = (path, options) => new Request(`https://api.motion.test${path}`, options)
@@ -57,15 +58,23 @@ describe('backend access and input rules', () => {
     expect(seen[0].values[0]).toBe('%100\\%%')
   })
 
-  it('uses the current Neon parameterized query API and transaction query API', async () => {
+  it('uses parameterized queries and a serialised transaction batch', async () => {
     const calls = []
-    const fakeSql = () => { throw new Error('Tagged templates are not used for parameterized statements.') }
-    fakeSql.query = async (statement, parameters) => { calls.push({ statement, parameters }); return [{ ok: true }] }
-    fakeSql.transaction = async (build) => build({ query: (statement, parameters) => ({ statement, parameters }) })
-    const db = createDatabaseClient(fakeSql)
+    const fakePool = {
+      query: async (statement, parameters) => { calls.push({ statement, parameters }); return { rows: [{ ok: true }] } },
+      connect: async () => ({
+        query: async (statement, parameters = []) => {
+          calls.push({ statement, parameters })
+          return { rows: [{ ok: true }] }
+        },
+        release() {},
+      }),
+    }
+    const db = createDatabaseClient(fakePool)
     await expect(db.query('SELECT $1', ['value'])).resolves.toEqual([{ ok: true }])
-    await expect(db.transaction((transaction) => [transaction.query('UPDATE example SET value=$1', ['value'])])).resolves.toEqual([{ statement: 'UPDATE example SET value=$1', parameters: ['value'] }])
-    expect(calls).toEqual([{ statement: 'SELECT $1', parameters: ['value'] }])
+    await expect(db.transaction((transaction) => [transaction.query('UPDATE example SET value=$1', ['value'])])).resolves.toEqual([[{ ok: true }]])
+    expect(calls.some((call) => call.statement === 'SELECT $1' && call.parameters[0] === 'value')).toBe(true)
+    expect(calls.some((call) => call.statement === 'BEGIN ISOLATION LEVEL SERIALIZABLE')).toBe(true)
   })
 
   it('rejects customer access to another customer resource', () => {
@@ -138,15 +147,11 @@ describe('backend access and input rules', () => {
   })
 
   it('refuses to start in production without a trusted client header', () => {
-    /* The auth values must now be real URLs: serverConfig validates that the
-       issuer is an origin and the JWKS is its well-known path, because pasting
-       one into both is the failure that presents as a broken login rather than
-       as a misconfiguration. Placeholders no longer get through. */
-    const base = {
-      DATABASE_URL: 'x',
-      NEON_AUTH_JWKS_URL: 'https://ep-test.neonauth.example.aws.neon.tech/neondb/auth/.well-known/jwks.json',
-      NEON_AUTH_ISSUER: 'https://ep-test.neonauth.example.aws.neon.tech',
-    }
+    /* The auth values must now be a real origin and a service_role JWT:
+       serverConfig validates that the publishable key cannot be pasted into
+       the service_role slot, because that mistake presents as a broken login
+       rather than as a misconfiguration. Placeholders no longer get through. */
+    const base = { ...serverEnv }
     expect(() => serverConfig({ ...base, NODE_ENV: 'production' })).toThrow(/API_TRUSTED_CLIENT_HEADER/)
     expect(serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'X-Real-IP' }).trustedClientHeader).toBe('x-real-ip')
 

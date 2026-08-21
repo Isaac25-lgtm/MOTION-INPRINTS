@@ -1,53 +1,22 @@
 import { createServer } from 'node:http'
-import pg from 'pg'
 import { createApi } from './api.js'
 import { createAuthenticator } from './auth.js'
 import { serverConfig } from './config.js'
+import { createDatabase } from './db.js'
 import { createClientKeyResolver, createHttpHandler } from './handler.js'
 import { createStorageAdapter } from './storage.js'
+import { createSupabaseAdmin } from './supabase.js'
 
 const port = Number(process.env.API_PORT || 8787)
 const config = serverConfig()
-const pool = new pg.Pool({
-  connectionString: config.databaseUrl,
-  ssl: /sslmode=require/.test(config.databaseUrl) ? { rejectUnauthorized: false } : false,
-})
-
-/* The deployed API uses Neon's HTTP driver. Local PostgreSQL needs the regular
-   pg driver, so this adapter keeps development faithful without changing the
-   production path. Queries within a transaction are deliberately serialized on
-   one client, matching the non-interactive transaction contract used by Neon. */
-const db = {
-  query: async (statement, parameters = []) => (await pool.query(statement, parameters)).rows,
-  transaction: async (build) => {
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      let queue = Promise.resolve()
-      const tx = {
-        query: (statement, parameters = []) => {
-          const operation = queue.then(async () => (await client.query(statement, parameters)).rows)
-          queue = operation.catch(() => {})
-          return operation
-        },
-      }
-      const results = await Promise.all(build(tx))
-      await client.query('COMMIT')
-      return results
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
-    }
-  },
-}
+const db = createDatabase(config)
+const supabase = createSupabaseAdmin(config)
 
 const api = createApi({
   db,
-  storage: createStorageAdapter(config.storage),
+  storage: createStorageAdapter({ supabase, publicBaseUrl: config.storage.publicBaseUrl }),
   mediaBaseUrl: config.storage.publicBaseUrl,
-  authenticate: createAuthenticator({ jwksUrl: config.authJwksUrl, issuer: config.authIssuer, db }),
+  authenticate: createAuthenticator({ supabase, db }),
   // Server-only allowlist. Never reaches the browser.
   ownerAllowedEmails: config.ownerAllowedEmails,
   ownersConfigured: config.ownersConfigured,

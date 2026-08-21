@@ -11,34 +11,20 @@ npm run build
 npm test
 
 # Applies db/migrations/*.sql in order; needs DATABASE_URL in the environment.
-node db/migrate.js --dry-run
-node db/migrate.js
+# Against Supabase, use the direct (non-pooled) URI — see SUPABASE.md.
+node --env-file=.env.supabase db/migrate.js --dry-run
+node --env-file=.env.supabase db/migrate.js
 ```
 
-### Making someone an administrator
+### Making someone an owner
 
-Everyone who signs up is a `customer`. There is no HTTP route, UI control or
-environment variable that grants `admin`, and no automatic "first user wins"
-rule — promotion needs a shell on the server and the database credential.
+Everyone who signs up is a `customer`. There is no HTTP route or UI control that grants `owner`. The normal path is the server-side allowlist:
 
-```sh
-# 1. Create the owner account and sign in (verify the email if prompted).
-# 2. Go to Account -> Profile and SAVE DETAILS ONCE.
-#    This creates the public.user_profiles row. Signing in alone does not —
-#    the script refuses to run without it, and will not create one itself.
-# 3. Get the exact Neon Auth user id — Neon Console -> Auth -> Users, or:
-#      SELECT id, email FROM neon_auth."user" ORDER BY "createdAt" DESC LIMIT 10;
-# 4. Promote that exact id:
-node --env-file=.env scripts/promote-admin.js <auth_user_id>
-# 5. Sign out and back in, then open /admin.
+1. Set `OWNER_ALLOWED_EMAILS` on the API (exactly two distinct addresses).
+2. The owner signs in at `/manager` (Google or email/password) and confirms their email.
+3. `POST /api/staff/bootstrap` upserts `user_profiles.role = owner`.
 
-node --env-file=.env scripts/promote-admin.js --list      # who exists, and their roles
-node --env-file=.env scripts/promote-admin.js <id> --demote
-```
-
-It takes an exact `auth_user_id` — never an email, a name, or "the earliest
-profile" — refuses to run if no matching profile exists, never creates one, and
-reports exactly which profile changed. Full procedure in `ENVIRONMENT.md`.
+`scripts/promote-admin.js` remains as break-glass recovery and needs a shell plus `DATABASE_URL`. Full procedure in `ENVIRONMENT.md` and `SUPABASE.md`.
 
 ## Structure
 
@@ -47,14 +33,15 @@ reports exactly which profile changed. Full procedure in `ENVIRONMENT.md`.
 - `src/pages/` — public pages plus the implemented customer quotation list and detail experience. Other customer/admin screens remain phased placeholders.
 - `src/layouts/` — header, footer, mobile drawer, search panel.
 - `src/content/` — CMS content provider; business copy and contact details come from the database, never from constants.
-- `src/services/` — API-only data access. No component talks to the backend directly.
-- `server/` — web-standard secure API handler, JWT authorization, validation, storage abstraction. Outside the browser bundle.
-- `db/migrations/` — version-controlled Neon Postgres schema and business-taxonomy seed.
+- `src/services/` — API-only data access. No component talks to the backend or to Supabase Postgres directly.
+- `server/` — web-standard secure API handler, Supabase Auth verification, validation, storage abstraction. Outside the browser bundle.
+- `db/migrations/` — version-controlled Postgres schema and business-taxonomy seed.
 
 ## Documentation
 
 | File | Covers |
 | --- | --- |
+| `SUPABASE.md` | Neon → Supabase rehearsal, connections, Auth/Storage console steps |
 | `GO_LIVE_AUDIT.md` | Production readiness verdict and blockers |
 | `BACKLOG.md` | Prioritised post-launch work |
 | `COMMERCE.md` | Pricing engine, cart, quotes, orders, payments |
@@ -74,4 +61,4 @@ The logo and brand colour are in place: the artwork was reconstructed from `moti
 
 The source contains no invented prices, customers, orders, testimonials, statistics or credentials.
 
-See `BACKEND_READINESS.md` for the outstanding infrastructure blockers (Neon Auth, API runtime, object storage).
+See `SUPABASE.md` for the Auth, database and Storage cutover. Neon is left running until that cutover is deliberately completed.

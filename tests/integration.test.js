@@ -53,9 +53,8 @@ describeIfDb('schema behaviour (real database)', () => {
       transaction: (build) => enqueue(async () => {
       const savepointName = `api_tx_${apiTransaction += 1}`
       await client.query(`SAVEPOINT ${savepointName}`)
-      // Neon accepts a non-interactive transaction batch. Queue the equivalent
-      // pg calls so PostgreSQL integration tests do not execute two statements on
-      // one Client concurrently (deprecated in pg 8 and removed in pg 9).
+      // Queue pg calls so PostgreSQL integration tests do not execute two
+      // statements on one Client concurrently (deprecated in pg 8 and removed in pg 9).
       let queue = Promise.resolve()
       const operations = build({ query: (statement, parameters = []) => {
         const operation = queue.then(async () => (await client.query(statement, parameters)).rows)

@@ -25,11 +25,12 @@
  * request log that seemed harmless is the usual way either ends up on disk.
  *
  * `server/index.js` is imported ONLY when this file is the process entry point.
- * It builds a database client and a JWKS fetcher from `serverConfig()` at module
- * scope, so importing it here unconditionally made merely importing the bridge
- * require DATABASE_URL, NEON_AUTH_JWKS_URL and NEON_AUTH_ISSUER — which crashed
- * the whole test suite on a machine with no environment configured, before the
- * bridge's own tests could run. The bridge translates Node to Fetch and knows
+ * It builds a database client and a Supabase Auth client from `serverConfig()`
+ * at module scope, so importing it here unconditionally made merely importing
+ * the bridge require DATABASE_URL, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+ * — which crashed the whole test suite on a machine with no environment
+ * configured, before the bridge's own tests could run. The bridge translates
+ * Node to Fetch and knows
  * nothing about the API it serves; that is exactly why it can be tested with a
  * stub, and why it must not drag production configuration in behind it.
  */

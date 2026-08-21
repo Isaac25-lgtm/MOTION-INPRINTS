@@ -6,18 +6,20 @@
    was applied — an edited migration is a different migration, and silently
    re-applying or skipping it is how environments drift apart.
 
-   Uses node-postgres rather than the Neon HTTP driver: the HTTP driver only talks
-   to a Neon endpoint, whereas this connects over standard TCP and therefore works
-   against a local Postgres and against Neon alike. That is what makes it possible
-   to rehearse a migration locally before it touches the hosted database.
+   Uses node-postgres over standard TCP. Advisory locks require a DIRECT
+   (non-pooled) connection: PgBouncer transaction pooling (Supabase port 6543,
+   hostname pooler.supabase.com) will not hold them. Rehearse against Supabase
+   with the direct URI in `.env.supabase` — see SUPABASE.md.
 
-   Usage:  node --env-file=.env db/migrate.js [--dry-run]
+   Usage:  node --env-file=.env.supabase db/migrate.js [--dry-run]
+           node --env-file=.env db/migrate.js [--dry-run]
    Reads DATABASE_URL from the environment. Never takes a connection string as an
    argument, so it cannot end up in shell history. */
 
 import { readdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import pg from 'pg'
+import { sslFor } from '../server/db.js'
 
 const MIGRATIONS_DIR = new URL('./migrations/', import.meta.url)
 const dryRun = process.argv.includes('--dry-run')
@@ -34,18 +36,34 @@ function describe(connectionString) {
   }
 }
 
+function assertDirectConnection(connectionString) {
+  try {
+    const url = new URL(connectionString)
+    const pooled = url.hostname.includes('pooler.supabase.com') || url.port === '6543'
+    if (pooled) {
+      console.error('DATABASE_URL points at the Supabase pooler.')
+      console.error('Migrations take an advisory lock and must use the DIRECT connection')
+      console.error('(db.<project-ref>.supabase.co, port 5432), not the pooler.')
+      console.error('See SUPABASE.md.')
+      process.exit(1)
+    }
+  } catch {
+    /* URL parse failed — connect() will fail with a clearer error. */
+  }
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
-    console.error('DATABASE_URL is not set. Try: node --env-file=.env db/migrate.js')
+    console.error('DATABASE_URL is not set. Try: node --env-file=.env.supabase db/migrate.js')
     process.exit(1)
   }
 
+  assertDirectConnection(databaseUrl)
+
   const client = new pg.Client({
     connectionString: databaseUrl,
-    // Neon requires TLS; a local server generally has none. Trust the URL's own
-    // sslmode, defaulting to off only for loopback.
-    ssl: /sslmode=require/.test(databaseUrl) ? { rejectUnauthorized: false } : false,
+    ssl: sslFor(databaseUrl),
   })
 
   await client.connect()

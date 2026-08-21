@@ -8,35 +8,37 @@ Connect the GitHub repository to a Render Static Site and use the production bra
 - Publish directory: `dist`
 - SPA rewrite/fallback: rewrite `/*` to `/index.html`
 
-`render.yaml` records the same configuration. The rewrite is required so direct visits to `/shop`, `/product/example`, and `/admin` load React Router rather than a static-host 404.
+`render.yaml` records the same configuration. The rewrite is required so direct visits to `/shop`, `/product/example`, and `/manager` load React Router rather than a static-host 404.
 
 Configure only browser-safe `VITE_*` variables in the static site. `VITE_API_BASE_URL` is mandatory in production and must be the absolute HTTPS URL of the secure API; it must not be `/api`. Variables are embedded at build time, so rebuild after changing them. Assets emitted by Vite are fingerprinted and cache-friendly. Production source maps are disabled to avoid publishing readable source maps.
 
 ### Variables Render prompts for
 
-`render.yaml` declares three variables with `sync: false`, so **Render asks for each value during the first Blueprint import** rather than deploying without them. No value is committed — a URL in the repository would be wrong for any other deployment, and is how a secret eventually ends up there.
+`render.yaml` declares frontend and API secrets with `sync: false`, so **Render asks for each value during the first Blueprint import** rather than deploying without them. No value is committed.
 
 | Variable | Value |
 | --- | --- |
-| `VITE_API_BASE_URL` | The **final public HTTPS URL of the secure API**. Not `/api`, not a placeholder, and never `localhost` |
-| `VITE_NEON_AUTH_URL` | The public Neon Auth URL, including the `/neondb/auth` path |
-| `VITE_NEON_AUTH_GOOGLE` | `true` to show the optional Google button |
+| `VITE_SUPABASE_URL` | The Supabase project origin, for example `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The publishable (anon) key. **Never** the service_role key |
+| `VITE_SUPABASE_GOOGLE` | `true` to show the optional Google button |
+
+`VITE_API_BASE_URL` is **not** prompted — Render resolves it from the API service.
 
 Three things worth knowing:
 
-- **Email and password is always available.** `VITE_NEON_AUTH_GOOGLE` only controls whether the Google button is *also* offered; it never disables the email flow.
-- **It defaults to shown.** Only the exact string `false` hides the button — leaving the prompt blank still shows it. If Google is not working on your Neon project, set `false` explicitly rather than leaving it empty.
+- **Email and password is always available.** `VITE_SUPABASE_GOOGLE` only controls whether the Google button is *also* offered; it never disables the email flow.
+- **It defaults to shown.** Only the exact string `false` hides the button — leaving the prompt blank still shows it. If Google is not enabled on the Supabase project, set `false` explicitly rather than leaving it empty.
 - **Changing any `VITE_*` variable needs a new deployment.** Vite embeds these at build time, so editing one in the Render dashboard changes nothing until the site is rebuilt.
 
 **Do not deploy with a fake or `localhost` API URL.** The build will succeed and the deploy will go green, but `assertRuntimeConfig()` throws before React renders and the site is a blank page — which reads as a build problem when it is a configuration one. `VITE_API_BASE_URL` must point at a real, reachable HTTPS API before the first useful deployment.
 
-Never place `DATABASE_URL`, Neon secrets, passwords, storage keys or payment credentials in the static site's environment. Those belong to the API runtime; anything given a `VITE_` name ships to every visitor in the bundle.
+Never place `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, passwords, storage keys or payment credentials in the static site's environment. Those belong to the API runtime; anything given a `VITE_` name ships to every visitor in the bundle.
 
 ## Secure API
 
 `render.yaml` deploys the API as a **Node Web Service** (`motion-api`) alongside the static site. `server/render.js` is a thin bridge — it converts Node requests into Fetch `Request` objects, hands them to the existing handler in `server/index.js`, and writes the `Response` back. No framework, no routing, no new dependency. Every rule about origins, rate limiting, authentication and errors stays in the handler, where it is tested.
 
-`server/dev.js` is unchanged and remains the local entry point against a local PostgreSQL.
+`server/dev.js` remains the local entry point.
 
 `npm run start:api` is the start command. `/healthz` answers `200 {"status":"ok"}` without a database, a credential or a configured origin, so a database hiccup cannot look like a dead process and trigger a restart loop.
 
@@ -50,19 +52,18 @@ Render assigns both public URLs at Blueprint creation and connects them with `fr
 
 `RENDER_EXTERNAL_URL` arrives as an origin with no path, and `render.yaml` cannot concatenate strings, so `src/config/env.js` appends the `/api` prefix when the value carries no path of its own. A value that already has one, such as `http://localhost:8787/api`, is left exactly as given.
 
-### What Render prompts for
+### What Render prompts for on the API
 
 | Prompt | Value |
 | --- | --- |
-| `DATABASE_URL` (API) | **SECRET.** Paste privately from Neon's newly rotated connection string |
-| `NEON_AUTH_JWKS_URL` (API) | The full Neon Auth JWKS URL, ending `/.well-known/jwks.json` |
-| `NEON_AUTH_ISSUER` (API) | The Neon Auth **origin only** — no `/neondb/auth` path |
-| `VITE_NEON_AUTH_URL` (frontend) | The **full** Neon Auth URL, including `/neondb/auth` |
-| `VITE_NEON_AUTH_GOOGLE` (frontend) | `true` |
+| `DATABASE_URL` | **SECRET.** Supabase **session pooler** URI (port 5432), `sslmode=require` |
+| `SUPABASE_URL` | The same public origin as `VITE_SUPABASE_URL` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **SECRET.** The service_role JWT from Supabase Settings → API |
+| `OWNER_ALLOWED_EMAILS` | Exactly two owner addresses, comma-separated |
 
-`VITE_API_BASE_URL` and `API_ALLOWED_ORIGINS` are **not** prompted — Render resolves both.
+`API_ALLOWED_ORIGINS` and `VITE_API_BASE_URL` are **not** prompted — Render resolves both. `API_TRUSTED_CLIENT_HEADER` is set to `none` in the Blueprint.
 
-**The database password must never be pasted into chat, a commit, the static site, or any `VITE_*` variable.** Everything with a `VITE_` name is compiled into the bundle and served to every visitor.
+**The database password and the service_role key must never be pasted into chat, a commit, the static site, or any `VITE_*` variable.** Everything with a `VITE_` name is compiled into the bundle and served to every visitor.
 
 ### Rate-limit identity on Render — the trade-off
 
@@ -80,14 +81,15 @@ If Render later documents a header it overwrites, set `API_TRUSTED_CLIENT_HEADER
 
 ### Before real API calls work
 
-1. **Apply the migrations to the new Neon project.** They are never run on deploy — a deploy that silently alters a schema is how a production database gets changed by accident. Run `node db/migrate.js --dry-run`, then `node db/migrate.js`, with `DATABASE_URL` pointed at Neon.
-2. **Add the frontend's Render URL to Neon Auth trusted domains** once Render has created it. Sign-in fails with `INVALID_ORIGIN` until you do.
+1. **Apply the migrations to the Supabase project.** They are never run on deploy — a deploy that silently alters a schema is how a production database gets changed by accident. Use the **direct** connection string (not the pooler). See `SUPABASE.md`.
+2. **Add the frontend's Render URL to Supabase Auth redirect URLs** once Render has created it. Sign-in fails until you do.
+3. **Do not change live Render variables or deploy as part of a code-only migration.** Swap DATABASE_URL and Auth variables in a later, deliberate cutover.
 
 ### Free plan
 
 Free web services sleep when idle and cold-start on the next request, which can take tens of seconds. That is fine for first testing, but **not appropriate for a live checkout or payment flow** — a customer will not wait, and a payment webhook arriving at a sleeping instance is a problem you do not want to debug. Move `motion-api` to a paid instance before taking real orders.
 
-The handler uses a server-side Neon connection and verifies Neon Auth JWTs against its JWKS endpoint. The browser never receives `DATABASE_URL`.
+The handler uses a server-side Postgres connection (`pg`) and verifies Supabase access tokens with `auth.getUser`. The browser never receives `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Rate-limit identity
 
@@ -99,4 +101,4 @@ The in-memory limiter is per instance. A runtime that scales to several instance
 
 ## Database migrations
 
-Apply `db/migrations` in filename order to the intended Neon branch using a controlled migration process (CI or Neon SQL editor), then promote tested branch changes to production. Do not edit an applied migration; create a new numbered migration.
+Apply `db/migrations` in filename order to the intended Supabase project using a controlled migration process, then promote tested changes. Do not edit an applied migration; create a new numbered migration. Use a **direct, non-pooled** connection: advisory locks do not work through the transaction pooler. Rehearsal commands are in `SUPABASE.md`.

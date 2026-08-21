@@ -2,7 +2,7 @@
 
 The SQL migrations in `db/migrations` are the source of truth. They use UUID primary keys, foreign keys, checks, indexes, `created_at`, and update triggers. Monetary values use `numeric(14,2)` and default to `UGX`; no binary data is stored in Postgres.
 
-`user_profiles.auth_user_id` is the Neon Auth identity reference. It deliberately stores no credential, password, token, or session data. The identity is verified by the server before a profile is created or used.
+`user_profiles.auth_user_id` is the authentication-provider identity reference. It deliberately stores no credential, password, token, or session data. The identity is verified by the server (Supabase Auth `getUser`) before a profile is created or used.
 
 Products use normalized `product_options`, `product_option_values`, and assignments; `pricing_rules.conditions` provides a constrained extension point for a later pricing engine. Orders snapshot titles/configurations, preserving production history if a catalogue product changes. Quotes can become an order through `orders.quote_id`.
 
@@ -34,11 +34,11 @@ erDiagram
   ORDERS ||--o{ PAYMENTS : has
 ```
 
-## Admin bootstrap
+## Owner bootstrap
 
-1. Enable Neon Auth and create/sign in with the intended owner identity.
-2. Create its normal customer profile through `POST /api/me`.
-3. From the Neon SQL editor using an owner-controlled connection, run an audited update for that identity: `UPDATE public.user_profiles SET role = 'admin' WHERE auth_user_id = '<Neon Auth UUID>';`.
-4. Confirm the user can access an admin API endpoint, and record the change in your operational log.
+1. Set `OWNER_ALLOWED_EMAILS` on the API to exactly two confirmed addresses.
+2. The owner signs in at `/manager` with Google or email/password (Supabase Auth).
+3. `POST /api/staff/bootstrap` verifies the session via `auth.getUser`, checks the allowlist, and upserts `public.user_profiles.role = 'owner'`.
+4. Confirm the user can access a management API endpoint. The grant is recorded in `admin_audit_log`.
 
-No password, service key, or administrator bootstrap token is stored in source control.
+No password, service key, or administrator bootstrap token is stored in source control. The legacy `scripts/promote-admin.js` path remains for recovery only.

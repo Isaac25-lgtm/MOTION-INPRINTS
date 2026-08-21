@@ -113,6 +113,16 @@ describe('guest checkout and requests', () => {
   })
 })
 
+describe('anonymous callers cannot reach private or manager APIs', () => {
+  it('rejects /api/me and manager data without a session', async () => {
+    const api = createApi({ db: commerceDb(), authenticate: anonymous, logger: silent })
+    expect((await api(req('/api/me'))).status).toBe(401)
+    expect((await api(req('/api/admin/products'))).status).toBe(401)
+    expect((await api(req('/api/admin/orders'))).status).toBe(401)
+    expect((await api(req('/api/staff/bootstrap', { method: 'POST' }))).status).toBe(401)
+  })
+})
+
 describe('the source code does not reintroduce a login wall', () => {
   const walk = async (dir, files = []) => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {

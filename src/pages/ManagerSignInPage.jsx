@@ -23,17 +23,17 @@ import { staffService } from '../services/staffService'
  *
  *   Signing in proves identity. It does not grant anything. After a session
  *   exists, the browser asks the API to bootstrap staff access; the server
- *   resolves the email from Neon Auth's own records using the verified token
- *   subject, checks it against a server-only allowlist, and only then writes the
- *   owner role. The browser never sends an email, a role or an "is owner" flag,
- *   and would not be believed if it did.
+ *   resolves the email from Supabase Auth using the verified token, checks it
+ *   against a server-only allowlist, and only then writes the owner role. The
+ *   browser never sends an email, a role or an "is owner" flag, and would not
+ *   be believed if it did.
  */
 
 /** Neutral for every refusal: unknown, unverified and not-an-owner look identical. */
 const REFUSED = 'This account is not authorised for Motion staff access.'
 
 export function ManagerSignInPage() {
-  const { configured, googleEnabled, isAuthenticated, isOwner, signIn, signInWithGoogle, refreshProfile, verificationMethod } = useAuth()
+  const { configured, googleEnabled, isAuthenticated, isOwner, signIn, signInWithGoogle, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [busy, setBusy] = useState(false)
@@ -132,24 +132,14 @@ export function ManagerSignInPage() {
 
               {unverified && (
                 <div className="state" role="alert">
-                  {verificationMethod === 'code' ? (
-                    <p className="t-body-sm">
-                      This address is not confirmed, and this installation is configured for
-                      verification <strong>codes</strong> rather than links. Switch the Neon Auth
-                      verification method to “link”, or set <code>VITE_NEON_AUTH_VERIFICATION</code> to match.
+                  <p className="t-body-sm">
+                    Confirm your email address first. We sent a link when the account was created.
+                  </p>
+                  <Button type="button" variant="text" size="sm" onClick={resend}>Send the link again</Button>
+                  {resent && (
+                    <p className="t-body-sm t-muted" role="status">
+                      If that address still needs confirming, a new link is on its way.
                     </p>
-                  ) : (
-                    <>
-                      <p className="t-body-sm">
-                        Confirm your email address first. We sent a link when the account was created.
-                      </p>
-                      <Button type="button" variant="text" size="sm" onClick={resend}>Send the link again</Button>
-                      {resent && (
-                        <p className="t-body-sm t-muted" role="status">
-                          If that address still needs confirming, a new link is on its way.
-                        </p>
-                      )}
-                    </>
                   )}
                 </div>
               )}

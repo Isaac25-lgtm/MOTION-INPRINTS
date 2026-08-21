@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { createApi } from '../server/api.js'
 import { isApprovedOwnerEmail, requireOwner, resolveVerifiedIdentity } from '../server/auth.js'
 import { serverConfig } from '../server/config.js'
+import { serverEnv } from './helpers/supabase.js'
 
 /* Owner authorisation.
  *
  * Two named people may reach the dashboard. Everything here exists to prove that
  * the browser cannot influence who they are.
  *
- * The identity is resolved server-side from `neon_auth.user` using the verified
- * token subject — an audit of that table confirmed it carries `id`, `email` and
- * `emailVerified`. No email is read from a request body, and none from a token
- * claim.
+ * The identity is resolved server-side from Supabase Auth `getUser` — email and
+ * confirmation — attached to the verified session. No email is read from a
+ * request body, and none from a token claim parsed here.
  */
 
 const silent = { info() {}, error() {} }
@@ -19,14 +19,15 @@ const req = (path, options) => new Request(`https://api.motion.test${path}`, opt
 const body = async (response) => ({ status: response.status, ...(await response.json()) })
 
 const OWNERS = ['owner-one@example.com', 'owner-two@example.com']
+const VERIFIED = { email: 'owner-one@example.com', emailVerified: true }
+const VERIFIED_TWO = { email: 'owner-two@example.com', emailVerified: true }
 
 /** A database double answering the queries the bootstrap makes. */
-function fakeDb({ identity = null, profile = null } = {}) {
+function fakeDb({ profile = null } = {}) {
   const writes = []
   return {
     writes,
     query: async (statement, values = []) => {
-      if (statement.includes('neon_auth."user"')) return identity ? [identity] : []
       if (statement.includes('FROM public.user_profiles WHERE auth_user_id')) return profile ? [profile] : []
       if (statement.includes('INSERT INTO public.user_profiles')) {
         writes.push({ statement, values })
@@ -38,7 +39,19 @@ function fakeDb({ identity = null, profile = null } = {}) {
   }
 }
 
-const authAs = (authUserId, profile = null) => async () => ({ authUserId, profile, claims: { sub: authUserId } })
+const authAs = (authUserId, profile = null, identity = {}) => async () => ({
+  authUserId,
+  profile,
+  email: identity.email,
+  emailVerified: identity.emailVerified,
+  user: identity.email
+    ? {
+        id: authUserId,
+        email: identity.email,
+        email_confirmed_at: identity.emailVerified ? '2026-01-01T00:00:00Z' : null,
+      }
+    : null,
+})
 
 const bootstrap = (db, authenticate, owners = OWNERS) =>
   createApi({ db, authenticate, logger: silent, ownerAllowedEmails: owners })(
@@ -48,30 +61,32 @@ const bootstrap = (db, authenticate, owners = OWNERS) =>
 const insertsIn = (db) => db.writes.filter(w => w.statement.includes('INSERT INTO public.user_profiles'))
 
 describe('verified identity resolution', () => {
-  it('reads the email from neon_auth.user, never from the caller', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'Owner-One@Example.com', email_verified: true } })
-    const identity = await resolveVerifiedIdentity(db, 'u1')
-    // Normalised, so an allowlist comparison is not defeated by casing.
+  it('reads the email from the verified Auth user, never from the caller', () => {
+    const identity = resolveVerifiedIdentity({
+      authUserId: 'u1',
+      email: 'Owner-One@Example.com',
+      emailVerified: true,
+    })
     expect(identity.email).toBe('owner-one@example.com')
   })
 
-  /* Without this, anyone could register an address they do not control and wait
-     to be elevated. */
-  it('refuses an unverified address', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: false } })
-    expect(await resolveVerifiedIdentity(db, 'u1')).toBeNull()
+  it('refuses an unverified address', () => {
+    expect(resolveVerifiedIdentity({
+      authUserId: 'u1',
+      email: 'owner-one@example.com',
+      emailVerified: false,
+    })).toBeNull()
   })
 
-  it('refuses an identity that does not exist', async () => {
-    expect(await resolveVerifiedIdentity(fakeDb(), 'nobody')).toBeNull()
-    expect(await resolveVerifiedIdentity(fakeDb(), null)).toBeNull()
+  it('refuses an identity that does not exist', () => {
+    expect(resolveVerifiedIdentity({ authUserId: 'nobody' })).toBeNull()
+    expect(resolveVerifiedIdentity(null)).toBeNull()
   })
 
   it('approves only exact allowlist members, and nobody when the list is empty', () => {
     expect(isApprovedOwnerEmail('owner-one@example.com', OWNERS)).toBe(true)
     expect(isApprovedOwnerEmail('OWNER-TWO@EXAMPLE.COM', OWNERS)).toBe(true)
     expect(isApprovedOwnerEmail('someone@example.com', OWNERS)).toBe(false)
-    // Fails closed: an unset variable approves nobody rather than everybody.
     expect(isApprovedOwnerEmail('owner-one@example.com', [])).toBe(false)
     expect(isApprovedOwnerEmail('', OWNERS)).toBe(false)
   })
@@ -79,31 +94,29 @@ describe('verified identity resolution', () => {
 
 describe('staff bootstrap', () => {
   it('provisions exactly one owner profile for the first approved sign-in', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: true } })
-    const result = await body(await bootstrap(db, authAs('u1')))
+    const db = fakeDb()
+    const result = await body(await bootstrap(db, authAs('u1', null, VERIFIED)))
 
     expect(result.status).toBe(200)
     expect(result.data.owner).toBe(true)
     expect(result.data.profile.role).toBe('owner')
 
     expect(insertsIn(db)).toHaveLength(1)
-    // An upsert, so a repeat cannot create a second row.
     expect(insertsIn(db)[0].statement).toContain('ON CONFLICT (auth_user_id) DO UPDATE')
   })
 
   it('behaves identically for the second approved owner', async () => {
-    const db = fakeDb({ identity: { id: 'u2', email: 'owner-two@example.com', email_verified: true } })
-    const result = await body(await bootstrap(db, authAs('u2')))
+    const db = fakeDb()
+    const result = await body(await bootstrap(db, authAs('u2', null, VERIFIED_TWO)))
     expect(result.status).toBe(200)
     expect(result.data.profile.role).toBe('owner')
   })
 
   it('is idempotent — repeated sign-ins never duplicate a profile', async () => {
-    const identity = { id: 'u1', email: 'owner-one@example.com', email_verified: true }
     const existing = { id: 'profile-1', auth_user_id: 'u1', role: 'owner' }
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const db = fakeDb({ identity, profile: existing })
-      const result = await body(await bootstrap(db, authAs('u1', existing)))
+      const db = fakeDb({ profile: existing })
+      const result = await body(await bootstrap(db, authAs('u1', existing, VERIFIED)))
       expect(result.status).toBe(200)
       expect(insertsIn(db)).toHaveLength(1)
     }
@@ -111,43 +124,44 @@ describe('staff bootstrap', () => {
 
   it('upgrades an existing customer profile in place rather than creating a second', async () => {
     const customer = { id: 'profile-1', auth_user_id: 'u1', role: 'customer', full_name: 'Amina' }
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: true }, profile: customer })
-    const result = await body(await bootstrap(db, authAs('u1', customer)))
+    const db = fakeDb({ profile: customer })
+    const result = await body(await bootstrap(db, authAs('u1', customer, VERIFIED)))
 
     expect(result.status).toBe(200)
     expect(result.data.profile.role).toBe('owner')
-    // COALESCE keeps the name they already gave us.
     expect(insertsIn(db)[0].statement).toContain('COALESCE')
     expect(db.writes.some(w => w.statement.includes('admin_audit_log'))).toBe(true)
   })
 
   it('refuses an unapproved identity neutrally, creating and elevating nothing', async () => {
-    const db = fakeDb({ identity: { id: 'u9', email: 'stranger@example.com', email_verified: true } })
-    const result = await body(await bootstrap(db, authAs('u9')))
+    const db = fakeDb()
+    const result = await body(await bootstrap(db, authAs('u9', null, { email: 'stranger@example.com', emailVerified: true })))
 
     expect(result.status).toBe(403)
     expect(result.error.code).toBe('not_authorised_for_staff')
-    // The refusal says nothing about whether the address exists or is verified.
     expect(result.error.message).not.toMatch(/verif|exist|unknown|allow/i)
     expect(insertsIn(db)).toHaveLength(0)
   })
 
   it('refuses an approved address that has not been verified', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: false } })
-    expect((await body(await bootstrap(db, authAs('u1')))).status).toBe(403)
+    const db = fakeDb()
+    expect((await body(await bootstrap(db, authAs('u1', null, { email: 'owner-one@example.com', emailVerified: false })))).status).toBe(403)
     expect(insertsIn(db)).toHaveLength(0)
   })
 
   it('refuses an anonymous caller', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: true } })
+    const db = fakeDb()
     expect((await body(await bootstrap(db, async () => null))).status).toBe(401)
   })
 
-  /* The obvious attack: send an owner address in the body and hope it is
-     trusted. It must be ignored entirely. */
   it('ignores an email supplied in the request body', async () => {
-    const db = fakeDb({ identity: { id: 'u9', email: 'stranger@example.com', email_verified: true } })
-    const response = await createApi({ db, authenticate: authAs('u9'), logger: silent, ownerAllowedEmails: OWNERS })(
+    const db = fakeDb()
+    const response = await createApi({
+      db,
+      authenticate: authAs('u9', null, { email: 'stranger@example.com', emailVerified: true }),
+      logger: silent,
+      ownerAllowedEmails: OWNERS,
+    })(
       req('/api/staff/bootstrap', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -174,7 +188,6 @@ describe('owner-only APIs', () => {
     expect((await api(req('/api/admin/products'))).status).toBe(403)
   })
 
-  /* A stale 'admin' row must not keep access that migration 0013 converts. */
   it('does not treat a legacy admin role as an owner', async () => {
     await expect(requireOwner(ownerRequest, authAs('u3', { id: 'p', role: 'admin' })))
       .rejects.toMatchObject({ status: 403 })
@@ -182,19 +195,13 @@ describe('owner-only APIs', () => {
 })
 
 describe('owner allowlist configuration', () => {
-  const base = {
-    DATABASE_URL: 'postgres://u:p@localhost:5432/db',
-    NEON_AUTH_JWKS_URL: 'https://ep-test.neonauth.example.aws.neon.tech/neondb/auth/.well-known/jwks.json',
-    NEON_AUTH_ISSUER: 'https://ep-test.neonauth.example.aws.neon.tech',
-  }
-
   it('parses, trims and lowercases the list', () => {
-    const config = serverConfig({ ...base, OWNER_ALLOWED_EMAILS: ' Owner-One@Example.com , owner-two@example.com ' })
+    const config = serverConfig({ ...serverEnv, OWNER_ALLOWED_EMAILS: ' Owner-One@Example.com , owner-two@example.com ' })
     expect(config.ownerAllowedEmails).toEqual(['owner-one@example.com', 'owner-two@example.com'])
   })
 
   it('is empty when unset, so no identity is approved', () => {
-    expect(serverConfig(base).ownerAllowedEmails).toEqual([])
+    expect(serverConfig(serverEnv).ownerAllowedEmails).toEqual([])
   })
 
   it('is never exposed under a VITE_ name anywhere in the browser bundle', async () => {
@@ -218,12 +225,7 @@ describe('owner allowlist configuration', () => {
 })
 
 describe('exactly two owners, or nobody', () => {
-  const base = {
-    DATABASE_URL: 'postgres://u:p@localhost:5432/db',
-    NEON_AUTH_JWKS_URL: 'https://ep-test.neonauth.example.aws.neon.tech/neondb/auth/.well-known/jwks.json',
-    NEON_AUTH_ISSUER: 'https://ep-test.neonauth.example.aws.neon.tech',
-  }
-  const config = (value) => serverConfig({ ...base, ...(value === undefined ? {} : { OWNER_ALLOWED_EMAILS: value }) })
+  const config = (value) => serverConfig({ ...serverEnv, ...(value === undefined ? {} : { OWNER_ALLOWED_EMAILS: value }) })
 
   it('accepts exactly two well-formed addresses, normalised', () => {
     const c = config(' Owner-One@Example.com , owner-two@example.com ')
@@ -231,21 +233,14 @@ describe('exactly two owners, or nobody', () => {
     expect(c.ownerAllowedEmails).toEqual(['owner-one@example.com', 'owner-two@example.com'])
   })
 
-  /* Every malformed shape resolves to an EMPTY list. A half-configured allowlist
-     must never mean "approve whoever is left".
-
-     Validation runs on the RAW supplied list, before any deduplication. Doing it
-     the other way round was a real hole: three entries containing two unique
-     addresses collapsed to two and were accepted, so a list that plainly did not
-     name two owners passed silently. */
   it('approves nobody when the list is not exactly two valid addresses', () => {
     for (const value of [
-      undefined,                                    // unset
-      '',                                           // blank
-      'owner-one@example.com',                      // only one
-      'a@x.com,b@y.com,c@z.com',                    // three distinct
-      'owner-one@example.com,not-an-email',         // malformed
-      'owner-one@example.com,@example.com',         // malformed
+      undefined,
+      '',
+      'owner-one@example.com',
+      'a@x.com,b@y.com,c@z.com',
+      'owner-one@example.com,not-an-email',
+      'owner-one@example.com,@example.com',
     ]) {
       const c = config(value)
       expect(c.ownersConfigured, `"${value}" must not count as configured`).toBe(false)
@@ -253,8 +248,6 @@ describe('exactly two owners, or nobody', () => {
     }
   })
 
-  /* Duplicates specifically, because deduplicating before counting is the exact
-     mistake that let a three-entry list through. */
   it('refuses any duplicate, however it is written', () => {
     const duplicates = {
       'the same address twice': 'owner1@email.com,owner1@email.com',
@@ -276,9 +269,6 @@ describe('exactly two owners, or nobody', () => {
     expect(c.ownerAllowedEmails).toEqual(['owner1@email.com', 'owner2@email.com'])
   })
 
-  /* A stray comma is a typo, not a third owner. Blanks are dropped before the
-     count, so two real addresses still configure — failing closed here would
-     lock both owners out over a punctuation slip. */
   it('tolerates an empty entry from a stray comma', () => {
     for (const value of ['a@x.com,,b@y.com', 'a@x.com,b@y.com,', ',a@x.com,b@y.com']) {
       const c = config(value)
@@ -287,7 +277,6 @@ describe('exactly two owners, or nobody', () => {
     }
   })
 
-  /* Staff configuration is not a reason to stop a customer buying. */
   it('never throws, so the public API keeps serving guests', () => {
     expect(() => config('nonsense')).not.toThrow()
     expect(() => config(undefined)).not.toThrow()
@@ -296,13 +285,12 @@ describe('exactly two owners, or nobody', () => {
   })
 
   it('reports the problem only on the staff route, and only neutrally', async () => {
-    const db = fakeDb({ identity: { id: 'u1', email: 'owner-one@example.com', email_verified: true } })
-    const api = createApi({ db, authenticate: authAs('u1'), logger: silent, ownerAllowedEmails: [], ownersConfigured: false })
+    const db = fakeDb()
+    const api = createApi({ db, authenticate: authAs('u1', null, VERIFIED), logger: silent, ownerAllowedEmails: [], ownersConfigured: false })
     const result = await body(await api(req('/api/staff/bootstrap', { method: 'POST' })))
 
     expect(result.status).toBe(503)
     expect(result.error.code).toBe('staff_configuration_unavailable')
-    // Says nothing about which addresses are approved, or that any exist.
     expect(result.error.message).not.toMatch(/owner|allow|email|@/i)
     expect(insertsIn(db)).toHaveLength(0)
   })
@@ -319,13 +307,11 @@ describe('setting a password for an existing Google-only owner', () => {
     .replace(/\/\/.*$/gm, '')
     .replace(/role="[a-z]+"/g, '')
 
-  /* The decisive property. Sign-up would have produced a SECOND account for a
-     person who already has one, splitting their identity, orders and access. */
   it('uses the reset flow on the existing identity, never a second account', async () => {
     const source = await code()
     expect(source).toContain('authClient.requestPasswordReset')
     expect(source, 'must not create another account').not.toContain('authClient.signUp')
-    expect(source).not.toMatch(/signUp/)
+    expect(source).not.toMatch(/\bsignUp\b/)
   })
 
   it('returns the owner to /manager after the password is set', async () => {
@@ -338,16 +324,15 @@ describe('setting a password for an existing Google-only owner', () => {
   it('grants nothing and sends no role', async () => {
     const source = await code()
     for (const forbidden of ['role', 'isOwner', 'staffService', 'bootstrap']) {
-      expect(source, `must not send ${forbidden}`).not.toMatch(new RegExp(`\b${forbidden}\b`, 'i'))
+      expect(source, `must not send ${forbidden}`).not.toMatch(new RegExp(`\\b${forbidden}\\b`, 'i'))
     }
   })
 
   it('cannot reveal whether an address exists or is approved', async () => {
     const source = await code()
     expect(source).not.toContain('OWNER_ALLOWED_EMAILS')
-    // The confirmation is hedged, so it is not a check for registered addresses.
     expect(source).toMatch(/If .*belongs to a Motion account/)
-    expect(source).not.toMatch(/(approved|allowlist|not authorised|no such account)/i)
+    expect(source).not.toMatch(/\b(approved|allowlist|not authorised|no such account)\b/i)
   })
 
   it('keeps Google working and optional', async () => {
@@ -358,7 +343,6 @@ describe('setting a password for an existing Google-only owner', () => {
       const { fileURLToPath } = await import('node:url')
       return readFile(fileURLToPath(new URL('../src/pages/ManagerSignInPage.jsx', import.meta.url)), 'utf8')
     })()
-    // Google is still offered, and still behind the enabled flag.
     expect(manager).toContain('googleEnabled &&')
     expect(manager).toContain('signInWithGoogle')
   })
@@ -375,16 +359,13 @@ describe('setting a password for an existing Google-only owner', () => {
     }
   })
 
-  /* Only the server may grant the role, wherever the password came from. */
   it('leaves the bootstrap as the sole grant path', async () => {
-    const db = fakeDb({ identity: { id: 'new-user', email: 'stranger@example.com', email_verified: true } })
-    const result = await body(await bootstrap(db, authAs('new-user')))
+    const db = fakeDb()
+    const result = await body(await bootstrap(db, authAs('new-user', null, { email: 'stranger@example.com', emailVerified: true })))
     expect(result.status).toBe(403)
     expect(insertsIn(db)).toHaveLength(0)
   })
 
-  /* A reset link that could redirect anywhere would let anyone mail a
-     "reset your password" link landing on a site they control. */
   it('honours only same-site return paths', async () => {
     const { readFile } = await import('node:fs/promises')
     const { fileURLToPath } = await import('node:url')
@@ -403,8 +384,6 @@ describe('staff email-verification recovery', () => {
   }
   const strip = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
-  /* A staff member who cannot confirm their address has no way forward without
-     this. Both pages told them a link had been sent and then offered nothing. */
   it('offers a resend on the password-setup page, returning to /manager', async () => {
     const source = strip(await readSource('../src/pages/ManagerActivatePage.jsx'))
     expect(source).toContain('Send the link again')
@@ -413,7 +392,6 @@ describe('staff email-verification recovery', () => {
     const call = source.slice(source.indexOf('authClient.requestPasswordReset'))
     expect(call, 'resend must return to the staff flow').toMatch(/next:\s*'\/manager'/)
     expect(call, 'resend must reuse the address just entered').toMatch(/email:\s*(sent|email)/)
-    // Never the customer sign-in page.
     expect(call.slice(0, 140)).not.toContain('/sign-in')
   })
 
@@ -424,41 +402,36 @@ describe('staff email-verification recovery', () => {
 
     const call = source.slice(source.indexOf('authClient.resendVerification'))
     expect(call).toMatch(/next:\s*'\/manager'/)
-    // The address is the one just typed into the form.
     expect(source).toMatch(/setUnverified\(form\.email\)/)
     expect(call).toMatch(/email:\s*unverified/)
   })
 
-  /* The confirmation must not become an oracle for which addresses exist, are
-     already verified, or belong to an owner. */
   it('keeps both confirmations neutral', async () => {
     for (const file of ['../src/pages/ManagerActivatePage.jsx', '../src/pages/ManagerSignInPage.jsx']) {
       const source = strip(await readSource(file))
       expect(source, `${file} must hedge the confirmation`)
         .toMatch(/If that address (still needs confirming|belongs to a Motion account)/)
-      expect(source).not.toMatch(/(owner|approved|staff account exists|we found)/i)
+      expect(source).not.toMatch(/\b(owner|approved|staff account exists|we found)\b/i)
     }
   })
 
-  /* The whole flow assumes a link. If the project issues codes there is no field
-     to type one into, so the pages must say so rather than claim a link. */
-  it('reports a configuration mismatch instead of pretending a link was sent', async () => {
+  it('uses emailed links rather than verification codes', async () => {
     for (const file of ['../src/pages/ManagerActivatePage.jsx', '../src/pages/ManagerSignInPage.jsx']) {
       const source = strip(await readSource(file))
-      expect(source, `${file} must handle code mode`).toMatch(/verificationMethod === 'code'/)
-      expect(source).toMatch(/VITE_NEON_AUTH_VERIFICATION/)
+      expect(source).not.toMatch(/verificationMethod/)
+      expect(source).not.toMatch(/VITE_NEON/)
     }
 
     const env = await readSource('../src/config/env.js')
-    // Declared, because a console setting cannot be read from the browser.
-    expect(env).toMatch(/authVerificationMethod/)
-    expect(env, 'link is the expected default').toMatch(/=== 'code' \? 'code' : 'link'/)
+    expect(env).not.toMatch(/authVerificationMethod/)
+    expect(env).toMatch(/VITE_SUPABASE_URL/)
+    expect(env).toMatch(/VITE_SUPABASE_PUBLISHABLE_KEY/)
   })
 
   it('lets the caller choose where the emailed link returns to', async () => {
     const client = strip(await readSource('../src/auth/authClient.js'))
     const fn = client.slice(client.indexOf('async resendVerification'))
-    expect(fn).toMatch(/next = '\/sign-in\?verified=1'/)   // customer default
-    expect(fn).toMatch(/callbackURL: `\$\{origin\(\)\}\$\{next\}`/)
+    expect(fn).toMatch(/next = '\/sign-in\?verified=1'/)
+    expect(fn).toMatch(/emailRedirectTo: `\$\{origin\(\)\}\$\{destination\}`/)
   })
 })

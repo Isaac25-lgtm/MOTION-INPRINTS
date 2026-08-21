@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* One-time owner promotion.
  *
- * Grants `owner` on public.user_profiles to exactly one Neon Auth user id.
+ * Grants `owner` on public.user_profiles to exactly one auth user id.
  *
  * Secondary to the staff bootstrap, which provisions an approved owner
  * automatically on sign-in. This remains for recovery: if OWNER_ALLOWED_EMAILS
@@ -21,13 +21,15 @@
  *   It also refuses to guess. Not "the earliest profile", not an email match,
  *   not a name match: an exact `auth_user_id`. Every convenience alternative
  *   promotes the wrong account the day two people sign up in the same minute.
- *   Identity lives in Neon Auth; this table only records the business role.
+ *   Identity lives with the authentication provider; this table only records
+ *   the business role.
  *
  * Reads DATABASE_URL from the environment and never takes it as an argument, so
  * it cannot end up in shell history.
  */
 
 import pg from 'pg'
+import { sslFor } from '../server/db.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -45,13 +47,12 @@ function usage(message) {
     node --env-file=.env scripts/promote-admin.js --list
 
   Finding the id
+    Preferred path: the owner signs in at /manager and the staff bootstrap
+    writes the role. This script is recovery only.
+
     The owner must sign up and sign in once first, so the application creates
-    their profile row. Then take the user id from the Neon Console under
-    Auth -> Users, or:
-
-      SELECT id, email FROM neon_auth."user" ORDER BY "createdAt" DESC LIMIT 10;
-
-    That id is the auth_user_id this script expects.
+    their profile row. Then take the user id from Supabase Dashboard →
+    Authentication → Users. That id is the auth_user_id this script expects.
 `)
   process.exit(1)
 }
@@ -64,7 +65,7 @@ async function main() {
 
   const client = new pg.Client({
     connectionString: databaseUrl,
-    ssl: /sslmode=require/.test(databaseUrl) ? { rejectUnauthorized: false } : false,
+    ssl: sslFor(databaseUrl),
   })
   await client.connect()
 
@@ -86,9 +87,9 @@ async function main() {
     }
 
     /* Refuse rather than create. A missing profile means the account has not
-       signed in yet, and inserting one here would attach an admin role to a row
+       signed in yet, and inserting one here would attach an owner role to a row
        the application never made — with no name, and no guarantee the id is even
-       a real Neon Auth user. */
+       a real Auth user. */
     const { rows: existing } = await client.query(
       'SELECT auth_user_id, role, full_name, company_name FROM public.user_profiles WHERE auth_user_id = $1',
       [target],

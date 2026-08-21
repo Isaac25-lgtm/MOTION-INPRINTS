@@ -7,8 +7,8 @@ import { authClient } from '../auth/authClient'
 
 /* Set a password for email sign-in, on an identity that already exists.
  *
- * The case this solves: an owner has signed in with Google, so Neon Auth holds
- * their identity with a `google` account row and no password. They want the
+ * The case this solves: an owner has signed in with Google, so Auth holds
+ * their identity with a Google provider and no password. They want the
  * option of email and password as well — one account, two ways in.
  *
  * It uses the password-reset flow deliberately. Reset acts on the EXISTING user
@@ -33,7 +33,7 @@ import { authClient } from '../auth/authClient'
  * only, or both.
  */
 export function ManagerActivatePage() {
-  const { configured, verificationMethod } = useAuth()
+  const { configured } = useAuth()
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(null)
@@ -74,44 +74,31 @@ export function ManagerActivatePage() {
 
         {sent ? (
           <div className="state" role="status">
-            {verificationMethod === 'code' ? (
-              /* The flow assumes an emailed link. Rather than claim one was sent
-                 when the project issues a numeric code — with nowhere to type it
-                 — it names the mismatch and the setting to change. */
-              <p className="t-body-sm">
-                This installation is configured for verification <strong>codes</strong> rather
-                than links, which this page cannot complete. Switch the Neon Auth verification
-                method to “link”, or set <code>VITE_NEON_AUTH_VERIFICATION</code> to match.
+            <p className="t-body">
+              If <strong>{sent}</strong> belongs to a Motion account, a link to set a password
+              is on its way. Open it, choose a password, and you will come back here to sign in.
+            </p>
+            <p className="t-body-sm t-muted">
+              Setting a password does not grant access. Access is confirmed when you sign in.
+            </p>
+            <div className="cluster">
+              <Button to="/manager" variant="secondary" size="sm">Go to staff sign in</Button>
+              <Button
+                type="button"
+                variant="text"
+                size="sm"
+                onClick={async () => {
+                  await authClient.requestPasswordReset({ email: sent, next: '/manager' })
+                  setResent(true)
+                }}
+              >
+                Send the link again
+              </Button>
+            </div>
+            {resent && (
+              <p className="t-body-sm t-muted" role="status">
+                If that address belongs to a Motion account, another link is on its way.
               </p>
-            ) : (
-              <>
-                <p className="t-body">
-                  If <strong>{sent}</strong> belongs to a Motion account, a link to set a password
-                  is on its way. Open it, choose a password, and you will come back here to sign in.
-                </p>
-                <p className="t-body-sm t-muted">
-                  Setting a password does not grant access. Access is confirmed when you sign in.
-                </p>
-                <div className="cluster">
-                  <Button to="/manager" variant="secondary" size="sm">Go to staff sign in</Button>
-                  <Button
-                    type="button"
-                    variant="text"
-                    size="sm"
-                    onClick={async () => {
-                      await authClient.requestPasswordReset({ email: sent, next: '/manager' })
-                      setResent(true)
-                    }}
-                  >
-                    Send the link again
-                  </Button>
-                </div>
-                {resent && (
-                  <p className="t-body-sm t-muted" role="status">
-                    If that address belongs to a Motion account, another link is on its way.
-                  </p>
-                )}
-              </>
             )}
           </div>
         ) : (
