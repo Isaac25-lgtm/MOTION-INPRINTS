@@ -45,7 +45,15 @@ node --env-file=.env.supabase db/migrate.js --dry-run
 node --env-file=.env.supabase db/migrate.js
 ```
 
-`--dry-run` lists pending files and writes nothing. The apply step creates the Motion schema (migrations 0001–0014) on the empty project. It does **not** copy Neon data. There is no customer, product, order, quote or payment seed.
+`--dry-run` lists pending files and writes nothing — it must not create `schema_migrations` or apply SQL. The apply step creates the Motion schema (migrations 0001–0014) on the empty project. It does **not** copy Neon data. There is no customer, product, order, quote or payment seed.
+
+When this machine cannot open a Postgres session (IPv4-only network vs Direct IPv6, or a stuck Session Pooler handshake), generate a SQL Editor script from the same files and checksums:
+
+```sh
+node scripts/generate-supabase-bootstrap.js
+```
+
+That writes gitignored `.tmp/supabase-bootstrap.sql`. Confirm the record table has no Motion filenames, then paste the generated file into the SQL Editor. Do not hand-maintain a second copy of the migrations.
 
 The runner refuses Transaction Pooler port **6543**. Direct and Session Pooler port **5432** are accepted.
 

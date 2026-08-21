@@ -13,21 +13,22 @@
    this client, so the lock is retained. Transaction Pooler port 6543 must
    never be used — it cannot hold the lock. See SUPABASE.md.
 
+   `--dry-run` connects and reads only. It does not take the advisory lock, does
+   not create schema_migrations, and does not apply files.
+
    Usage:  node --env-file=.env.supabase db/migrate.js [--dry-run]
            node --env-file=.env db/migrate.js [--dry-run]
    Reads DATABASE_URL from the environment. Never takes a connection string as an
    argument, so it cannot end up in shell history. */
 
 import { readdir, readFile } from 'node:fs/promises'
-import { createHash } from 'node:crypto'
 import pg from 'pg'
 import { sslFor } from '../server/db.js'
 import { assertMigrationConnection } from './migration-connection.js'
+import { runMigrations } from './run-migrations.js'
 
 const MIGRATIONS_DIR = new URL('./migrations/', import.meta.url)
 const dryRun = process.argv.includes('--dry-run')
-
-const checksum = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
 
 /** Describes the target without ever printing credentials. */
 function describe(connectionString) {
@@ -54,79 +55,30 @@ async function main() {
   })
 
   await client.connect()
-  // Serialize migration runners. Two deploys starting together must not both
-  // read the same pending set and race to create the same tables or constraints.
-  await client.query("SELECT pg_advisory_lock(hashtext('motion_schema_migrations'))")
-  const { rows: [version] } = await client.query('SELECT version()')
-  console.log(`  target   ${describe(databaseUrl)}`)
-  console.log(`  server   ${version.version.split(',')[0]}\n`)
-
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS public.schema_migrations (
-      filename text PRIMARY KEY,
-      checksum text NOT NULL,
-      applied_at timestamptz NOT NULL DEFAULT now()
-    )
-  `)
-
-  const files = (await readdir(MIGRATIONS_DIR)).filter(name => name.endsWith('.sql')).sort()
-  const { rows: appliedRows } = await client.query('SELECT filename, checksum FROM public.schema_migrations')
-  const applied = new Map(appliedRows.map(row => [row.filename, row.checksum]))
-
-  let pending = 0
-  let failed = false
-
-  for (const filename of files) {
-    const contents = await readFile(new URL(filename, MIGRATIONS_DIR), 'utf8')
-    const digest = checksum(contents)
-    const previous = applied.get(filename)
-
-    if (previous) {
-      if (previous !== digest) {
-        console.error(`\n  ${filename} has changed since it was applied (${previous} -> ${digest}).`)
-        console.error('  Applied migrations are immutable. Add a new migration instead of editing this one.')
-        failed = true
-        break
-      }
-      console.log(`  skip     ${filename}`)
-      continue
-    }
-
-    pending += 1
-    if (dryRun) { console.log(`  pending  ${filename}`); continue }
-
-    process.stdout.write(`  apply    ${filename} ... `)
-    try {
-      // One transaction per migration: Postgres runs DDL transactionally, so a
-      // failure part-way rolls the whole file back rather than leaving a
-      // half-migrated schema.
-      await client.query('BEGIN')
-      await client.query(contents)
-      await client.query('INSERT INTO public.schema_migrations(filename, checksum) VALUES ($1, $2)', [filename, digest])
-      await client.query('COMMIT')
-      console.log('ok')
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {})
-      console.log('FAILED')
-      console.error(`\n  ${filename}`)
-      console.error(`  ${error.message}`)
-      if (error.position) console.error(`  at character ${error.position}`)
-      if (error.hint) console.error(`  hint: ${error.hint}`)
-      failed = true
-      break
-    }
+  const names = (await readdir(MIGRATIONS_DIR)).filter(name => name.endsWith('.sql')).sort()
+  const files = []
+  for (const filename of names) {
+    files.push({ filename, contents: await readFile(new URL(filename, MIGRATIONS_DIR), 'utf8') })
   }
+
+  console.log(`  target   ${describe(databaseUrl)}`)
+
+  const result = await runMigrations(client, { dryRun, files, log: {
+    log: (...args) => console.log(...args),
+    error: (...args) => console.error(...args),
+    write: (text) => process.stdout.write(text),
+  } })
+
+  if (result.version) console.log(`  server   ${result.version.split(',')[0]}\n`)
 
   await client.end()
 
-  if (failed) process.exit(1)
-  if (!pending) console.log('\n  schema is up to date')
-  else if (dryRun) console.log(`\n  ${pending} migration(s) pending`)
-  else console.log(`\n  applied ${pending} migration(s)`)
+  if (result.failed) process.exit(1)
+  if (!result.pending) console.log('\n  schema is up to date')
+  else if (dryRun) console.log(`\n  ${result.pending} migration(s) pending`)
+  else console.log(`\n  applied ${result.pending} migration(s)`)
 }
 
-/* Started only when run directly, so tests can import the connection guard
-   without this file connecting to Postgres as a side effect. */
 const isEntryPoint = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
 if (isEntryPoint) {
   main().catch(error => { console.error(error.message); process.exit(1) })
