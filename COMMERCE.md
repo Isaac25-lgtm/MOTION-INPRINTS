@@ -125,16 +125,17 @@ from `awaiting_upload` / `artwork_required` to `received` /
 
 The UI reports filename, size, progress, failure and completion, and supports
 retry, remove and replacement. It becomes operational when the object-storage
-adapter and Neon Auth session are configured; neither is simulated in production.
+adapter and a Supabase Auth session are configured; neither is simulated in production.
 
 ## Deliberately deferred
 
 - **8.5 payment gateway** — deliberately held until a provider is chosen. `createUnconfiguredProvider` fails loudly with a clear message rather than pretending.
 - **Delivery pricing** — no business rule exists, so no figure is shown. Checkout says the cost is confirmed separately rather than inventing one.
-- **Live artwork storage** — the complete private upload workflow exists, but transfer remains unavailable until Neon Object Storage (or the approved initial object-storage service) is provisioned.
-- **Live account sessions** — `/account/quotes` and `/account/quotes/:id` are implemented and ownership-protected; Neon Auth still has to be configured before a browser can sign in.
+- **Live artwork storage** — the complete private upload workflow exists, but transfer remains unavailable until a real signed PUT/GET against Supabase Storage (`motion-private` / `motion-public`) has been verified.
+- **Live account sessions** — `/account/quotes` and `/account/quotes/:id` are implemented and ownership-protected; a real Supabase browser session against the rehearsal project has not been verified in this audit.
 
 The integration suite exercises the migration chain, database constraints and
 real API calls for pricing, checkout/idempotency, customer quotes, CMS, guest
-tokens and artwork lifecycle against the local PostgreSQL 18 verification instance. The remaining tests use
-bounded in-process doubles. Neon deployment remains an infrastructure prerequisite.
+tokens and artwork lifecycle when `DATABASE_URL` is set. The remaining tests use
+bounded in-process doubles. Pointing Render at Supabase is a deliberate cutover,
+not a default.

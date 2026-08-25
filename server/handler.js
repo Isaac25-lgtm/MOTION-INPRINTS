@@ -35,7 +35,7 @@ function fingerprint(value) {
  * Neither value is verified at this point — the limiter runs before
  * authentication, by design, so an unverified request cannot consume database
  * work. A caller rotating Authorization values does get fresh buckets, but each
- * rotated value then fails JWKS verification, so it buys nothing. The limiter is
+ * rotated value then fails `auth.getUser`, so it buys nothing. The limiter is
  * a cost control, not an authorisation boundary.
  *
  * `trustedClientHeader` is only ever set to a header the runtime is known to

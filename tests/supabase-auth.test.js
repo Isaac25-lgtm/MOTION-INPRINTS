@@ -119,3 +119,13 @@ describe('API bearer tokens are resolved server-side', () => {
     })).toBeNull()
   })
 })
+
+describe('operator docs match the Supabase runtime', () => {
+  it('does not tell operators that AuthProvider is a hardcoded anonymous session', async () => {
+    const audit = await readFile(fileURLToPath(new URL('../GO_LIVE_AUDIT.md', import.meta.url)), 'utf8')
+    expect(audit).not.toMatch(/returns a hardcoded anonymous session/i)
+    expect(audit).not.toMatch(/Neon Auth is not connected/i)
+    expect(audit).toMatch(/supabase\.auth\.getUser/)
+    expect(audit).toMatch(/Do not re-run the bootstrap SQL/)
+  })
+})

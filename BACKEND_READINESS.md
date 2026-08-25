@@ -26,12 +26,12 @@ Current target: **Supabase Auth**, **Supabase Postgres** (via `pg` on the Render
 
 These are operator steps. Do not treat them as missing application features.
 
-- Apply migrations 0001–0014 to the empty Supabase project using its **direct** connection string (`SUPABASE.md`).
-- Configure Supabase Auth: email confirmation, Google provider, and redirect URLs (`localhost`, `127.0.0.1`, then the Render frontend). Same-email Google and email/password identities are linked automatically; do not enable a dashboard “automatic linking” setting — that control is for **manual** linking, which this app does not use.
-- Add the Supabase variables on Render (`motion-api` and `motion-frontend`). Do not deploy a cutover until guest checkout, customer sign-in, Google, email/password, and `/manager` have been verified against Supabase.
+- Migrations **0001–0014 are already on the rehearsal Supabase project** (SQL Editor bootstrap). Confirm `public.schema_migrations` has those 14 filenames before touching schema. Do not re-apply the bootstrap.
+- Supabase Auth console for this project is configured (email + confirm, Google, Site URL and redirects including localhost and the Render frontend). Same-email Google and email/password identities are linked automatically; leave dashboard **manual** linking **off**.
+- Add the Supabase variables on Render (`motion-api` and `motion-frontend`) only at cutover. Remove `VITE_NEON_*` and Neon Auth JWKS/issuer names from the frontend or the app refuses to start. Do not deploy a cutover until guest checkout, customer sign-in, Google, email/password, and `/manager` have been verified against Supabase.
 - Replace the bounded in-memory rate-limit fallback with a durable distributed limiter before high-volume production traffic.
 - Build remaining admin CRUD polish and a payment provider when those workflows are approved.
-- Only then retire the Neon project and Neon-named Render variables.
+- Rotate the database password and Google OAuth client secret before public launch if they ever appeared in chat. Only then retire the Neon project and Neon-named Render variables.
 
 ## BLOCKERS
 
