@@ -1,18 +1,28 @@
 -- Least-privilege login for the Render API.
 --
--- The migration user remains the schema owner. Configure DATABASE_URL with the
--- motion_app role after setting its password in Neon; do not use the owner URL
--- for application traffic.
+-- The migration user remains the schema owner. Before applying this migration,
+-- create motion_app as a login with a strong password in the Neon Console. The
+-- password must never be stored in a migration or committed to the repository.
 
 BEGIN;
 
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'motion_app') THEN
-    CREATE ROLE motion_app LOGIN NOINHERIT;
+    RAISE EXCEPTION USING
+      MESSAGE = 'Required Neon role motion_app does not exist.',
+      HINT = 'Create motion_app as a login with a strong password in the Neon Console, then rerun migrations.';
+  END IF;
+
+  IF NOT (SELECT rolcanlogin FROM pg_roles WHERE rolname = 'motion_app') THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'Required Neon role motion_app cannot log in.',
+      HINT = 'Enable login and set a strong password for motion_app in the Neon Console, then rerun migrations.';
   END IF;
 END
 $$;
+
+ALTER ROLE motion_app NOINHERIT;
 
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;

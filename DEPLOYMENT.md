@@ -73,10 +73,11 @@ If Render later documents a header it overwrites, set `API_TRUSTED_CLIENT_HEADER
 
 ### Before real API calls work
 
-1. **Apply the migrations to Neon** from a controlled machine using `MIGRATION_DATABASE_URL` (direct, unpooled). They are never run on deploy. Pooled URLs are rejected because the runner uses a session advisory lock. See `ENVIRONMENT.md`.
-2. **Set `ADMIN_USERS_JSON`** with distinct administrator hashes from `scripts/hash-admin-password.js`. Production refuses to start without a valid list.
-3. **Set the Neon `motion_app` password**, then configure Render `DATABASE_URL` with that pooled role URI. Keep the database-owner direct URI only for controlled migrations.
-4. **Do not change live Render variables or deploy as part of this local implementation.** Another engineer audits the diff first.
+1. **Create the Neon `motion_app` role** in the Neon Console with login enabled and a strong password. Do this before migration `0016`; no role password belongs in Git or migration SQL.
+2. **Apply the migrations to Neon** from a controlled machine using the database-owner `MIGRATION_DATABASE_URL` (direct, unpooled). They are never run on deploy. Pooled URLs are rejected because the runner uses a session advisory lock. See `ENVIRONMENT.md`.
+3. **Set `ADMIN_USERS_JSON`** with distinct administrator hashes from `scripts/hash-admin-password.js`. Production refuses to start without a valid list.
+4. **Configure Render `DATABASE_URL`** with the pooled URI for `motion_app`, not the database owner. Keep the database-owner direct URI only for controlled migrations.
+5. **Do not change live Render variables or deploy as part of this local implementation.** Another engineer audits the diff first.
 
 ### Free plan
 

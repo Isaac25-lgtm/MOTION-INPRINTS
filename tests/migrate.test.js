@@ -148,9 +148,13 @@ describe('migration files', () => {
     expect(sql).not.toMatch(/DROP COLUMN.*customer_id/)
   })
 
-  it('creates a DML-only Neon runtime role', async () => {
+  it('requires a pre-created login and grants it DML-only runtime access', async () => {
     const sql = await readFile(new URL('0016_neon_runtime_role.sql', migrationDir), 'utf8')
-    expect(sql).toContain('CREATE ROLE motion_app LOGIN NOINHERIT')
+    expect(sql).toContain('Required Neon role motion_app does not exist.')
+    expect(sql).toContain('SELECT rolcanlogin FROM pg_roles')
+    expect(sql).toContain('ALTER ROLE motion_app NOINHERIT')
+    expect(sql).not.toMatch(/CREATE ROLE\s+motion_app/i)
+    expect(sql).not.toMatch(/PASSWORD\s+['"]/i)
     expect(sql).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO motion_app')
     expect(sql).toContain('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
   })

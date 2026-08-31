@@ -35,7 +35,7 @@ Obsolete names that must not be set (the process refuses to start if they are pr
 
 Local development may omit `MIGRATION_DATABASE_URL` when `DATABASE_URL` itself is a direct localhost connection.
 
-Migration `0016_neon_runtime_role.sql` creates the restricted `motion_app` login. Set that role's password in Neon, then configure the pooled production `DATABASE_URL` with username `motion_app`. The migration URI remains the database-owner direct URL and is used only from a controlled machine.
+Before applying migration `0016_neon_runtime_role.sql`, create a `motion_app` role with login enabled and a strong password in the Neon Console. The migration refuses to create a passwordless role; it verifies the role and grants only the runtime privileges it needs. After the migration succeeds, configure the pooled production `DATABASE_URL` with username `motion_app`. The migration URI remains the database-owner direct URL and is used only from a controlled machine.
 
 TLS is required for hosted Neon URLs (`sslmode=require`). Channel binding can be requested by adding `channel_binding=require` to the URI when Neon and the driver support it. The application does not rewrite connection strings.
 
