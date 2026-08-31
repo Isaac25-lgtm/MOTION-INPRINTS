@@ -314,7 +314,7 @@ function Process() {
   const steps = [
     { title: 'Discuss', note: 'We agree what the job actually is — sizes, materials, quantities, where it goes and when you need it.' },
     { title: 'Design', note: 'Artwork is prepared or adapted for production, and you approve a proof before anything goes ahead.' },
-    { title: 'Produce', note: 'The job moves into production once the proof is approved, and you can follow its status from your account.' },
+    { title: 'Produce', note: 'The job moves into production once the proof is approved, and you can follow its status with your tracking code.' },
     { title: 'Deliver', note: 'Finished work is handed over, with installation arranged for the jobs that need it.' },
   ]
   /* Warm off-white rather than the pale blue wash it used to carry. That band

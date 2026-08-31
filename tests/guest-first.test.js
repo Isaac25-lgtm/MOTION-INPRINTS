@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { readFile, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { createApi } from '../server/api.js'
 
 /* Guest-first.
  *
- * Motion sells to people who have never signed in and never will. An account is
- * a convenience — saved details, history, proofs, reordering — and must never
- * become a condition of buying. These tests exist because that is exactly the
- * kind of requirement that gets added by accident, one guard at a time.
+ * Motion sells to people who have never signed in and never will. Customers
+ * browse, configure, inquire, order and track as guests. These tests exist
+ * because a login wall is exactly the kind of requirement that gets added by
+ * accident, one guard at a time.
  *
  * Anonymous here means anonymous: `authenticate` returns null, as it does for a
  * request carrying no Authorization header at all.
@@ -114,24 +113,22 @@ describe('guest checkout and requests', () => {
 })
 
 describe('anonymous callers cannot reach private or manager APIs', () => {
-  it('rejects /api/me and manager data without a session', async () => {
+  it('rejects removed account routes and manager data without a session', async () => {
     const api = createApi({ db: commerceDb(), authenticate: anonymous, logger: silent })
-    expect((await api(req('/api/me'))).status).toBe(401)
+    expect((await api(req('/api/me'))).status).toBe(404)
+    expect((await api(req('/api/staff/bootstrap', { method: 'POST' }))).status).toBe(404)
     expect((await api(req('/api/admin/products'))).status).toBe(401)
     expect((await api(req('/api/admin/orders'))).status).toBe(401)
-    expect((await api(req('/api/staff/bootstrap', { method: 'POST' }))).status).toBe(401)
+    expect((await api(req('/api/admin/session'))).status).toBe(401)
   })
 })
 
 describe('the source code does not reintroduce a login wall', () => {
-  const walk = async (dir, files = []) => {
-    for (const entry of await readdir(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name)
-      if (entry.isDirectory()) await walk(path, files)
-      else if (/\.jsx?$/.test(entry.name)) files.push(path)
-    }
-    return files
-  }
+  it('stores the administrator token in sessionStorage, never localStorage', async () => {
+    const source = await readFile(fileURLToPath(new URL('../src/services/adminSession.js', import.meta.url)), 'utf8')
+    expect(source).toContain('sessionStorage')
+    expect(source).not.toContain('localStorage')
+  })
 
   it('never wraps a purchase route in an authentication guard', async () => {
     const app = await readFile(fileURLToPath(new URL('../src/App.jsx', import.meta.url)), 'utf8')
@@ -144,18 +141,22 @@ describe('the source code does not reintroduce a login wall', () => {
     }
   })
 
-  it('labels the header account control neutrally rather than as a sign-in demand', async () => {
+  it('keeps Cart and Track Order in public navigation and has no Account link', async () => {
     const header = await readFile(fileURLToPath(new URL('../src/layouts/SiteHeader.jsx', import.meta.url)), 'utf8')
-    expect(header).toContain('label="Account"')
-    // "Sign in" as the anonymous label implies a requirement that does not exist.
-    expect(header).not.toMatch(/isAuthenticated \? 'Your account' : 'Sign in'/)
+    expect(header).toMatch(/\/cart/)
+    expect(header).toMatch(/\/track-order/)
+    expect(header).not.toMatch(/label="Account"/)
+    expect(header).not.toMatch(/\/sign-in/)
+    expect(header).not.toMatch(/\/account/)
   })
 
-  it('states on both auth pages that an account is optional', async () => {
-    const auth = await readFile(fileURLToPath(new URL('../src/pages/AuthPages.jsx', import.meta.url)), 'utf8')
-    const mentions = auth.match(/Creating an account is optional/g) || []
-    expect(mentions.length, 'sign-in and sign-up must both say it').toBe(2)
-    expect(auth).toMatch(/place an order\s*\n?\s*and track it as a guest/)
+  it('does not ship customer sign-in, sign-up, or account pages', async () => {
+    const app = await readFile(fileURLToPath(new URL('../src/App.jsx', import.meta.url)), 'utf8')
+    for (const route of ['/sign-in', '/sign-up', '/reset-password', '/account', '/manager/activate']) {
+      expect(app, `removed route ${route}`).not.toContain(`path="${route}`)
+    }
+    expect(app).not.toContain('AuthPages')
+    expect(app).not.toContain('AccountPages')
   })
 
   it('never links the management area from public chrome', async () => {
@@ -163,9 +164,6 @@ describe('the source code does not reintroduce a login wall', () => {
       const source = await readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')
       expect(source, `${file} must not advertise the management area`).not.toMatch(/\/manager/)
     }
-    // Nor from the customer account area.
-    const account = await readFile(fileURLToPath(new URL('../src/pages/account/AccountPages.jsx', import.meta.url)), 'utf8')
-    expect(account).not.toMatch(/\/manager/)
   })
 })
 

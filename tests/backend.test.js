@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import { createApi } from '../server/api.js'
 import { ApiError, parsePaging } from '../server/http.js'
-import { requireOwnership } from '../server/auth.js'
 import { validateUpload } from '../server/storage.js'
 import { productSchema, quoteRequestSchema, validate } from '../server/validation.js'
-import { createClientKeyResolver, createMemoryRateLimiter } from '../server/handler.js'
+import { createClientKeyResolver, createHttpHandler, createMemoryRateLimiter } from '../server/handler.js'
 import { createDatabaseClient } from '../server/db.js'
 import { serverConfig } from '../server/config.js'
-import { serverEnv } from './helpers/supabase.js'
+import { adminUsersJson, ownerActor, serverEnv } from './helpers/env.js'
 
 const silentLogger = { info() {}, error() {} }
 const request = (path, options) => new Request(`https://api.motion.test${path}`, options)
@@ -77,10 +76,6 @@ describe('backend access and input rules', () => {
     expect(calls.some((call) => call.statement === 'BEGIN ISOLATION LEVEL SERIALIZABLE')).toBe(true)
   })
 
-  it('rejects customer access to another customer resource', () => {
-    expect(() => requireOwnership({ customer_id: 'customer-b' }, { profile: { id: 'customer-a' } })).toThrow(ApiError)
-  })
-
   it('rejects unauthenticated admin access', async () => {
     const api = createApi({ db: { query: async () => [] }, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products', { method: 'POST', body: '{}' })))
@@ -89,13 +84,14 @@ describe('backend access and input rules', () => {
 
   it('accepts a valid quote request and never invents a price', async () => {
     const seen = []
-    const api = createApi({ db: { query: async (statement, values) => {
+    const query = async (statement, values) => {
       seen.push({ statement, values })
       // The reference generator probes for a collision first; an empty result
       // means the candidate reference is free.
       if (statement.startsWith('SELECT 1 FROM')) return []
       return [{ id: 'q', request_number: 'MOT-Q-K7P2QX', status_code: 'submitted' }]
-    } }, logger: silentLogger })
+    }
+    const api = createApi({ db: { query, transaction: async (build) => Promise.all(build({ query })) }, logger: silentLogger })
     const result = await responseBody(await api(request('/api/quote-requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contactName: 'Ada Client', contactEmail: 'ada@example.com', projectBrief: 'A clear request for branded signage.' }) })))
     expect(result.status).toBe(201)
     const insert = seen.find(call => call.statement.includes('INSERT INTO public.quote_requests'))
@@ -130,28 +126,36 @@ describe('backend access and input rules', () => {
   })
 
   it('requires admin role, not merely authentication, for product changes', async () => {
-    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'auth-id', profile: { id: 'customer-id', role: 'customer' } }), logger: silentLogger })
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ actorId: 'auth-id', username: 'mallory', role: 'customer' }), logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Cards', slug: 'cards', pricingType: 'quote_only', quoteRequired: true }) })))
     expect(result.status).toBe(403); expect(result.error.code).toBe('owner_required')
   })
 
-  it('separates rate-limit buckets per client instead of pooling every visitor', () => {
+  it('uses only a deployment-trusted header as a client identity', () => {
     const resolve = createClientKeyResolver({ trustedClientHeader: 'x-real-ip' })
     expect(resolve(request('/api/products', { headers: { 'x-real-ip': '203.0.113.5' } }))).toBe('client:203.0.113.5')
     const first = resolve(request('/api/orders', { headers: { authorization: 'Bearer token-a' } }))
     const second = resolve(request('/api/orders', { headers: { authorization: 'Bearer token-b' } }))
-    expect(first).not.toBe(second)
-    expect(first).not.toContain('token-a')
-    // Unidentifiable callers are not forced into one shared bucket, which would limit the whole site as a single client.
+    expect(first).toBeNull()
+    expect(second).toBeNull()
     expect(resolve(request('/api/products'))).toBeNull()
   })
 
+  it('bounds anonymous mutations even when callers rotate fake bearer tokens', async () => {
+    const handler = createHttpHandler(
+      async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 }),
+      { allowedOrigins: [], rateLimit: { windowMs: 60_000, max: 100, maxKeys: 100, anonymousMutationMax: 2 } },
+    )
+    const first = await handler(request('/api/orders', { method: 'POST', headers: { authorization: 'Bearer fake-one' } }))
+    const second = await handler(request('/api/orders', { method: 'POST', headers: { authorization: 'Bearer fake-two' } }))
+    const blocked = await handler(request('/api/orders', { method: 'POST', headers: { authorization: 'Bearer fake-three' } }))
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(blocked.status).toBe(429)
+  })
+
   it('refuses to start in production without a trusted client header', () => {
-    /* The auth values must now be a real origin and a service_role JWT:
-       serverConfig validates that the publishable key cannot be pasted into
-       the service_role slot, because that mistake presents as a broken login
-       rather than as a misconfiguration. Placeholders no longer get through. */
-    const base = { ...serverEnv }
+    const base = { ...serverEnv, ADMIN_USERS_JSON: adminUsersJson() }
     expect(() => serverConfig({ ...base, NODE_ENV: 'production' })).toThrow(/API_TRUSTED_CLIENT_HEADER/)
     expect(serverConfig({ ...base, NODE_ENV: 'production', API_TRUSTED_CLIENT_HEADER: 'X-Real-IP' }).trustedClientHeader).toBe('x-real-ip')
 
@@ -164,39 +168,30 @@ describe('backend access and input rules', () => {
     expect(acknowledged.trustedClientHeader).toBeNull()
   })
 
-  /* Naming a header the platform merely appends to is worse than naming none:
-     it hands every caller a bucket of their own choosing while the code reads as
-     though limiting is in force. This pins the ordering that makes a spoofable
-     header unable to affect an authenticated caller. */
-  it('never lets a client-supplied header override session identity', () => {
+  it('does not use bearer values as a rate-limit identity', () => {
     const resolve = createClientKeyResolver({ trustedClientHeader: 'x-forwarded-for' })
 
-    // A caller spoofing the header cannot escape or widen their session bucket.
     const spoofed = resolve(request('/api/orders', {
       headers: { authorization: 'Bearer token-a', 'x-forwarded-for': '9.9.9.9' },
     }))
     const rotated = resolve(request('/api/orders', {
       headers: { authorization: 'Bearer token-a', 'x-forwarded-for': '8.8.8.8' },
     }))
-    expect(spoofed).toBe(rotated)
-    expect(spoofed).toMatch(/^session:/)
-    expect(spoofed).not.toContain('9.9.9.9')
+    expect(spoofed).toBe('client:9.9.9.9')
+    expect(rotated).toBe('client:8.8.8.8')
 
-    // The header still identifies callers who present no credential at all.
     expect(resolve(request('/api/products', { headers: { 'x-forwarded-for': '203.0.113.5' } })))
       .toBe('client:203.0.113.5')
 
-    // With no trusted header configured, anonymous callers stay unidentifiable
-    // rather than being pooled into one bucket that limits the whole site.
-    const sessionOnly = createClientKeyResolver({ trustedClientHeader: null })
-    expect(sessionOnly(request('/api/products', { headers: { 'x-forwarded-for': '203.0.113.5' } }))).toBeNull()
-    expect(sessionOnly(request('/api/orders', { headers: { authorization: 'Bearer t' } }))).toMatch(/^session:/)
+    const noTrustedHeader = createClientKeyResolver({ trustedClientHeader: null })
+    expect(noTrustedHeader(request('/api/products', { headers: { 'x-forwarded-for': '203.0.113.5' } }))).toBeNull()
+    expect(noTrustedHeader(request('/api/orders', { headers: { authorization: 'Bearer t' } }))).toBeNull()
   })
 
   it('applies a partial admin PATCH without demanding every field', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'product-id', slug: 'cards', status: 'published' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }) })))
     expect(result.status).toBe(200)
     expect(seen[0].statement).toContain('SET status=$1')
@@ -205,39 +200,38 @@ describe('backend access and input rules', () => {
   })
 
   it('rejects an admin PATCH that carries no fields', async () => {
-    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/products/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{}' })))
     expect(result.status).toBe(422); expect(result.error.code).toBe('empty_update')
   })
 
-  it('stops a customer from placing objects in public website buckets', async () => {
-    const storage = { createUploadUrl: async () => ({ url: 'signed', method: 'PUT' }) }
+  it('stops a customer-shaped actor from placing objects in storage', async () => {
+    const storage = { configured: true, createUploadUrl: async () => ({ url: 'signed', method: 'PUT' }) }
     const db = {
       query: async () => [{ id: 'owned-order-item', object_key: 'k' }],
       transaction: async (build) => Promise.all(build({ query: async () => [] })),
     }
-    const customer = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
+    const customer = createApi({ db, storage, authenticate: async () => ({ actorId: 'c', username: 'mallory', role: 'customer' }), logger: silentLogger })
     const body = JSON.stringify({ filename: 'x.png', mimeType: 'image/png', byteSize: 100, purpose: 'product_image' })
     const blocked = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
     expect(blocked.status).toBe(403); expect(blocked.error.code).toBe('owner_required')
     const fakeProof = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'proof.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'design_proof' }) })))
     expect(fakeProof.status).toBe(403)
-    const admin = createApi({ db, storage, authenticate: async () => ({ authUserId: 'a', profile: { id: 'pa', role: 'owner' } }), logger: silentLogger })
+    const admin = createApi({ db, storage, authenticate: async () => ownerActor, logger: silentLogger })
     const allowed = await responseBody(await admin(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body })))
     expect(allowed.status).toBe(201)
-    // Customers keep their own private artwork route.
     const artwork = await responseBody(await customer(request('/api/files/upload-intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork', orderItemId: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d' }) })))
-    expect(artwork.status).toBe(201)
+    expect(artwork.status).not.toBe(201)
+    expect(artwork.status).toBe(403)
   })
 
-  it('does not create an artwork row when signed storage is unavailable', async () => {
+  it('does not create an artwork row when storage is unconfigured', async () => {
     const seen = []
     const db = {
       query: async (statement) => { seen.push(statement); return [{ id: 'owned' }] },
       transaction: async () => { throw new Error('transaction must not start') },
     }
-    const storage = { createUploadUrl: async () => { throw new ApiError(501, 'storage_not_configured', 'Storage unavailable.') } }
-    const api = createApi({ db, storage, authenticate: async () => ({ authUserId: 'c', profile: { id: 'pc', role: 'customer' } }), logger: silentLogger })
+    const api = createApi({ db, storage: { configured: false }, authenticate: async () => ownerActor, logger: silentLogger })
     const response = await responseBody(await api(request('/api/files/upload-intent', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ filename: 'a.pdf', mimeType: 'application/pdf', byteSize: 100, purpose: 'customer_artwork', orderItemId: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d' }),
@@ -249,7 +243,7 @@ describe('backend access and input rules', () => {
   it('updates one content entry rather than every key in the section', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c', section: 'contact', entry_key: 'details' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/content/contact', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entryKey: 'details', value: { phone: '' } }) })))
     expect(result.status).toBe(200)
     expect(seen[0].statement).toContain('WHERE section = $8 AND entry_key = $9')
@@ -264,7 +258,7 @@ describe('backend access and input rules', () => {
   it('clears a stale schedule when content is published immediately', async () => {
     const seen = []
     const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'c' }] } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/content/announcement', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'published' }),
     })))
@@ -281,7 +275,7 @@ describe('backend access and input rules', () => {
       seen.push({ statement, values })
       return [{ id: '6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', status_code: 'sent', currency: 'UGX' }]
     } }
-    const api = createApi({ db, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d/send', { method: 'POST' })))
     expect(result.status).toBe(200)
     expect(result.data.accessToken).toBeTruthy()
@@ -291,7 +285,7 @@ describe('backend access and input rules', () => {
   })
 
   it('does not expose the legacy quote PATCH bypass', async () => {
-    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ({ authUserId: 'a', profile: { id: 'p', role: 'owner' } }), logger: silentLogger })
+    const api = createApi({ db: { query: async () => [] }, authenticate: async () => ownerActor, logger: silentLogger })
     const result = await responseBody(await api(request('/api/admin/quotes/6f1a2f56-0f1e-4a0e-9a1f-4a4d1a2b3c4d', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ statusCode: 'sent' }),
     })))

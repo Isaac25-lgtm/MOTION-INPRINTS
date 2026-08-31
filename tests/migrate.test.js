@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { assertMigrationConnection } from '../db/migration-connection.js'
+import { assertMigrationConnection, isPooledNeonUrl, resolveMigrationDatabaseUrl } from '../db/migration-connection.js'
 import { checksum } from '../db/migration-checksum.js'
 import { runMigrations } from '../db/run-migrations.js'
-import { generateBootstrapSql, stripOuterTransaction } from '../scripts/generate-supabase-bootstrap.js'
 
-const direct = 'postgresql://postgres:x@db.example.supabase.co:5432/postgres'
-const session = 'postgresql://postgres.example:x@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres'
-const transaction = 'postgresql://postgres.example:x@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres'
+const neonDirect = 'postgresql://user:x@ep-example.us-east-1.aws.neon.tech:5432/neondb?sslmode=require'
+const neonPooled = 'postgresql://user:x@ep-example-pooler.us-east-1.aws.neon.tech:5432/neondb?sslmode=require'
+const neonPgBouncer = 'postgresql://user:x@ep-example.us-east-1.aws.neon.tech:5432/neondb?pgbouncer=true'
+const neon6543 = 'postgresql://user:x@ep-example.us-east-1.aws.neon.tech:6543/neondb'
+const localDirect = 'postgresql://motion:motion@127.0.0.1:5432/motion_test'
 const silent = { log() {}, error() {}, write() {} }
 
 const migrationDir = new URL('../db/migrations/', import.meta.url)
@@ -23,17 +24,28 @@ const loadFiles = async () => {
 }
 
 describe('migration DATABASE_URL guard', () => {
-  it('accepts a Direct connection', () => {
-    expect(() => assertMigrationConnection(direct)).not.toThrow()
+  it('accepts a direct Neon or local connection', () => {
+    expect(() => assertMigrationConnection(neonDirect)).not.toThrow()
+    expect(() => assertMigrationConnection(localDirect)).not.toThrow()
+    expect(isPooledNeonUrl(neonDirect)).toBe(false)
   })
 
-  it('accepts Session Pooler port 5432', () => {
-    expect(() => assertMigrationConnection(session)).not.toThrow()
+  it('refuses pooled Neon URLs because the runner uses a session advisory lock', () => {
+    expect(isPooledNeonUrl(neonPooled)).toBe(true)
+    expect(isPooledNeonUrl(neonPgBouncer)).toBe(true)
+    expect(isPooledNeonUrl(neon6543)).toBe(true)
+    expect(() => assertMigrationConnection(neonPooled)).toThrow(/unpooled|advisory lock|Pooled/)
+    expect(() => assertMigrationConnection(neon6543)).toThrow(/6543/)
   })
 
-  it('refuses pooler port 6543', () => {
-    expect(() => assertMigrationConnection(transaction)).toThrow(/6543/)
-    expect(() => assertMigrationConnection(transaction)).toThrow(/Transaction Pooler/)
+  it('prefers MIGRATION_DATABASE_URL and falls back only to direct localhost', () => {
+    expect(resolveMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: neonDirect, DATABASE_URL: neonPooled })).toBe(neonDirect)
+    expect(resolveMigrationDatabaseUrl({ DATABASE_URL: localDirect })).toBe(localDirect)
+    expect(() => resolveMigrationDatabaseUrl({ DATABASE_URL: neonDirect })).toThrow(/localhost|MIGRATION_DATABASE_URL/)
+    expect(() => resolveMigrationDatabaseUrl({ DATABASE_URL: neonPooled }))
+      .toThrow(/MIGRATION_DATABASE_URL/)
+    expect(() => resolveMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: neonPooled }))
+      .toThrow(/unpooled|advisory lock|Pooled/)
   })
 })
 
@@ -42,9 +54,9 @@ describe('migration runner design', () => {
     const source = await readFile(fileURLToPath(new URL('../db/migrate.js', import.meta.url)), 'utf8')
     const runner = await readFile(fileURLToPath(new URL('../db/run-migrations.js', import.meta.url)), 'utf8')
     expect(source).toContain('new pg.Client')
+    expect(source).toContain('resolveMigrationDatabaseUrl')
     expect(runner).toContain("pg_advisory_lock(hashtext('motion_schema_migrations'))")
     expect(source).not.toMatch(/new pg\.Pool/)
-    expect(source).toContain('assertMigrationConnection')
     expect(source).not.toContain('pg_terminate_backend')
     expect(runner).not.toContain('pg_terminate_backend')
   })
@@ -100,8 +112,8 @@ describe('dry-run makes no database writes', () => {
   })
 })
 
-describe('SQL Editor bootstrap generator', () => {
-  it('includes all 14 migrations in order with runner checksums', async () => {
+describe('migration files', () => {
+  it('includes 0015 after the immutable 0001–0014 chain', async () => {
     const files = await loadFiles()
     expect(files.map((file) => file.filename)).toEqual([
       '0001_motion_core.sql',
@@ -118,41 +130,28 @@ describe('SQL Editor bootstrap generator', () => {
       '0012_proof_supersession_invariant.sql',
       '0013_owner_role_and_digital_first.sql',
       '0014_supabase_rls_and_storage.sql',
+      '0015_neon_guest_admin.sql',
+      '0016_neon_runtime_role.sql',
     ])
-    const sql = generateBootstrapSql(files)
-    let cursor = 0
-    for (const file of files) {
-      const digest = checksum(file.contents)
-      const stamp = `INSERT INTO public.schema_migrations(filename, checksum) VALUES ('${file.filename}', '${digest}');`
-      const index = sql.indexOf(stamp)
-      expect(index, file.filename).toBeGreaterThan(cursor)
-      cursor = index
-      expect(sql).toContain(`-- ${file.filename}`)
-      const body = stripOuterTransaction(file.contents).replace(/\s+$/, '')
-      expect(sql).toContain(body)
-    }
-    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.schema_migrations/)
-    const begins = sql.match(/^BEGIN;/gm) || []
-    const commits = sql.match(/^COMMIT;/gm) || []
-    expect(begins).toHaveLength(14)
-    expect(commits).toHaveLength(14)
   })
 
-  it('does not put secrets, env names, or live credentials in the output', async () => {
-    const files = await loadFiles()
-    const sql = generateBootstrapSql(files)
-    const header = sql.slice(0, sql.indexOf('-- 0001_motion_core.sql'))
-    expect(header).not.toContain('DATABASE_URL')
-    expect(header).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
-    expect(header).not.toContain('OWNER_ALLOWED_EMAILS')
-    expect(sql).not.toContain('DATABASE_URL')
-    expect(sql).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
-    expect(sql).not.toContain('postgresql://')
-    expect(sql).not.toContain('postgres://')
-    expect(sql).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\./)
-    expect(sql).not.toMatch(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)
-    const generator = await readFile(fileURLToPath(new URL('../scripts/generate-supabase-bootstrap.js', import.meta.url)), 'utf8')
-    expect(generator).not.toContain('process.env')
-    expect(generator).not.toContain('.env.supabase')
+  it('creates guest contacts and administrator sessions without dropping historical columns', async () => {
+    const sql = await readFile(new URL('0015_neon_guest_admin.sql', migrationDir), 'utf8')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS public.customer_contacts')
+    expect(sql).toContain('customer_contacts_normalized_email_uidx')
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS contact_id')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS public.admin_sessions')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS public.admin_login_attempts')
+    expect(sql).toMatch(/DISABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/Not accounts/)
+    expect(sql).not.toMatch(/DROP TABLE public\.user_profiles/)
+    expect(sql).not.toMatch(/DROP COLUMN.*customer_id/)
+  })
+
+  it('creates a DML-only Neon runtime role', async () => {
+    const sql = await readFile(new URL('0016_neon_runtime_role.sql', migrationDir), 'utf8')
+    expect(sql).toContain('CREATE ROLE motion_app LOGIN NOINHERIT')
+    expect(sql).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO motion_app')
+    expect(sql).toContain('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
   })
 })

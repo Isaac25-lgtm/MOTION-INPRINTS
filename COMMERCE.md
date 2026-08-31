@@ -116,26 +116,26 @@ Reads `DATABASE_URL` from the environment; never accepts a connection string as 
 
 ## Artwork
 
-Artwork uses a private, owner-scoped upload-intent flow. The browser validates
-type and size, transfers to a short-lived provider URL, then asks the API to
-verify and complete the asset. Database rows start `pending`; failed transfers
-are never presented as available files. Completion advances the item and order
-from `awaiting_upload` / `artwork_required` to `received` /
-`artwork_received`. Removing the last available artwork reverses those states.
+Artwork uses a private, administrator-only upload-intent flow once a storage
+adapter is configured. The browser validates type and size, transfers to a
+short-lived provider URL, then asks the API to verify and complete the asset.
+Database rows start `pending`; failed transfers are never presented as available
+files. Completion advances the item and order from `awaiting_upload` /
+`artwork_required` to `received` / `artwork_received`. Removing the last
+available artwork reverses those states.
 
-The UI reports filename, size, progress, failure and completion, and supports
-retry, remove and replacement. It becomes operational when the object-storage
-adapter and a Supabase Auth session are configured; neither is simulated in production.
+This phase uses the unconfigured adapter. Upload intents return
+`storage_not_configured`. Guests are told to send files directly. Do not pretend
+a transfer succeeded.
 
 ## Deliberately deferred
 
 - **8.5 payment gateway** — deliberately held until a provider is chosen. `createUnconfiguredProvider` fails loudly with a clear message rather than pretending.
 - **Delivery pricing** — no business rule exists, so no figure is shown. Checkout says the cost is confirmed separately rather than inventing one.
-- **Live artwork storage** — the complete private upload workflow exists, but transfer remains unavailable until a real signed PUT/GET against Supabase Storage (`motion-private` / `motion-public`) has been verified.
-- **Live account sessions** — `/account/quotes` and `/account/quotes/:id` are implemented and ownership-protected; a real Supabase browser session against the rehearsal project has not been verified in this audit.
+- **Live artwork storage** — the complete private upload workflow exists, but transfer remains unavailable until an S3-compatible provider is configured. Neon does not replace object storage.
+- **Customer accounts** — not offered. Guests track orders with the confirmation token.
 
 The integration suite exercises the migration chain, database constraints and
-real API calls for pricing, checkout/idempotency, customer quotes, CMS, guest
-tokens and artwork lifecycle when `DATABASE_URL` is set. The remaining tests use
-bounded in-process doubles. Pointing Render at Supabase is a deliberate cutover,
-not a default.
+real API calls for pricing, checkout/idempotency, guest contacts, CMS, guest
+tokens and artwork refusal when `DATABASE_URL` is set. The remaining tests use
+bounded in-process doubles. Live Render is not changed by this work.

@@ -187,8 +187,8 @@ export function AdminSettingsPage() {
     { label: 'Tax', value: 'No tax rate is configured. Quotes carry tax only when a rate is set on the individual quote.' },
     { label: 'Delivery pricing', value: 'No delivery rules exist. Checkout confirms delivery cost with the customer separately.' },
     { label: 'Payment provider', value: 'None connected. Online payment is unavailable until one is chosen and configured.' },
-    { label: 'Object storage', value: env.supabaseUrl ? 'Supabase Storage is prepared. Private artwork and proofs use signed URLs; public catalogue images use the public bucket. Transfer works once the buckets in SUPABASE.md exist.' : 'Not connected. Artwork and proof files cannot be transferred yet.' },
-    { label: 'Accounts', value: env.supabaseUrl && env.supabasePublishableKey ? 'Email and password sign-in is configured.' : 'No authentication project configured. Customers order as guests.' },
+    { label: 'Object storage', value: 'Not connected. Artwork and proof files cannot be transferred yet. Send files directly.' },
+    { label: 'Customer accounts', value: 'Customers browse, order, inquire and track as guests. There is no customer sign-in.' },
   ]
 
   return (

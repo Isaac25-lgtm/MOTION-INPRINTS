@@ -1,14 +1,14 @@
 # Production readiness audit
 
-Assessed on the `feat/supabase-migration` branch. Live Render still runs the **Neon** stack until a deliberate cutover.
+Assessed after replacing customer identity and Supabase dependencies with Neon PostgreSQL and server-owned administrator sessions. **Do not deploy this change to live Render until the local diff has been audited.**
 
-**Recommendation: do not cut production over to Supabase until a real browser sign-in and an authenticated API request have succeeded against this project.** The application code is wired for Supabase. That is not the same as live verification.
+**Recommendation: keep live Render unchanged.** Apply 0015 and swap environment variables only after that audit, from a controlled machine, using a direct Neon connection for migrations.
 
 ---
 
 ## READY (code)
 
-Verified by the current automated suite (see the latest `npm test` / `npm run build` on this branch).
+Verified by the current automated suite (see the latest `npm test` / `npm run build` on this working tree).
 
 **Commercial correctness.** The server prices everything; no request body carries money. Quote-only configurations cannot be bought. Money is integer shillings; VAT uses basis points.
 
@@ -26,29 +26,24 @@ Verified by the current automated suite (see the latest `npm test` / `npm run bu
 | Guest tokens stored hashed | CHECK constraint `^[0-9a-f]{64}$` |
 | Webhook replays are inert | `UNIQUE(provider, event_id)` |
 
-**Authorization.** Admin routes reject authenticated customers with 403 and anonymous callers with 401. Roles come from `user_profiles`, never from the JWT. Owner access is `OWNER_ALLOWED_EMAILS` (exactly two distinct confirmed addresses on the API) plus `POST /api/staff/bootstrap`. Google sign-in does not grant staff. Guest tracking requires a 256-bit token.
+**Authorization.** Customers never authenticate. Admin routes reject anonymous callers with 401 and non-owner actors with 403. Owner access is a hashed opaque session issued from `ADMIN_USERS_JSON`. Guest tracking and quote access require a 256-bit token; a reference or quote id alone is never enough.
 
 **Workflow.** Status transitions are validated server-side. The customer timeline shows only stages that actually happened.
 
-**Honesty.** No fabricated statistics, testimonials, awards, client counts or company history. No seeded revenue. No fake products or portfolio entries.
+**Honesty.** No fabricated statistics, testimonials, awards, client counts or company history. No seeded revenue. No fake products or portfolio entries. Uploads return `storage_not_configured` until a provider is connected.
 
-**Identity.** The browser uses `@supabase/supabase-js`. The API verifies access tokens with `supabase.auth.getUser` and then loads `user_profiles`. Sign-in is implemented in code; it is not a stub session. Guest browse / quote / cart / checkout / track still work with no session.
+**Identity.** Administrators sign in with username and password. The raw token lives in browser `sessionStorage`. Only the SHA-256 hash is stored. Guest browse / quote / cart / checkout / track work with no session.
 
-## Schema on the rehearsal project
+## Schema
 
-Migrations **0001–0014** were applied through the Supabase SQL Editor (not `db/migrate.js` from this Windows IPv4-only PC). Confirm with `SELECT filename FROM public.schema_migrations ORDER BY filename;` — expect those 14 rows. **Do not re-run the bootstrap SQL.** There is no customer/catalogue data to preserve, but a second apply will fail on existing objects.
+Migrations **0001–0014 are immutable**. **0015** adds `customer_contacts`, `admin_sessions`, `admin_login_attempts`, nullable `contact_id` foreign keys, a snapshot backfill, and disables the previous Data API RLS configuration. `user_profiles` and `customer_id` remain for rollback and must not be used by application code.
 
 ## BLOCKERS (operator / live)
 
-None of these are “AuthProvider is disconnected.” They are cutover and content:
-
-1. **Live browser sign-in against this Supabase project has not been verified from this audit.** Email confirmation, Google (Testing audience), and `/manager` bootstrap must be exercised before calling auth live.
-2. **Render still points at Neon.** Swap API and frontend variables only after (1), in a deliberate cutover. See `SUPABASE.md` and `DEPLOYMENT.md`.
-3. **Object storage.** Signed upload/download against `motion-private` / `motion-public` has not been proven in a browser on this project.
-4. **No payment provider.** The abstraction fails loudly rather than pretending.
-5. **No real catalogue/content.** Placeholders remain; do not invent products, projects, or testimonials.
-
-Also before public launch: rotate the database password and Google OAuth client secret (they appeared in earlier chat). Keep the Google OAuth app in **Testing** until branding, privacy policy, terms, and domain verification are ready. Add Google test users as **separate** emails, not one comma-separated field.
+1. **This change is not deployed.** Do not update live Render services or the production database from this work.
+2. **Object storage.** No signed upload/download provider is connected.
+3. **No payment provider.** The abstraction fails loudly rather than pretending.
+4. **No real catalogue/content.** Placeholders remain; do not invent products, projects, or testimonials.
 
 Two business decisions remain: **VAT registration** (tax is absent until confirmed) and **delivery pricing** (checkout says the cost is confirmed separately).
 
@@ -57,14 +52,14 @@ Two business decisions remain: **VAT registration** (tax is absent until confirm
 - Self-hosted fonts in place of the Google Fonts CDN
 - Knockout logo for dark backgrounds
 - CSV export from reports
-- Media library UI at `/admin/files`
+- Media library UI at `/admin/files` once storage exists
 - Admin CMS editing screen (the API and audit trail exist; the form does not)
 - Physical-device testing across the stated breakpoints
 
 ## Version note
 
-The rehearsal database is Supabase Postgres **17**. Local machines may differ. Applied migrations are the source of truth in `public.schema_migrations`, not a second copy of the SQL.
+Applied migrations are the source of truth in `public.schema_migrations`, not a second copy of the SQL.
 
 ---
 
-**Do not go live on Supabase** until guest checkout, email/password (including confirm email), Google, a normal customer account, and `/manager` for the two allowlisted owners have been checked against this project with Render pointing at it. Ordinary Google users must remain customers.
+**Do not go live on this branch** until guest checkout, inquiry submission, quote response by token, order tracking, and `/manager` username/password sign-in have been checked against a Neon database that is not the live Render database.

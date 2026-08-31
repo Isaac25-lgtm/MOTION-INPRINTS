@@ -21,20 +21,11 @@ export const orderService = {
     headers: idempotencyKey ? { 'idempotency-key': idempotencyKey } : undefined,
     body,
   }),
-
-  /** @returns {Promise<Order[]>} */
-  list: (options) => request('/orders', options),
-  /** @returns {Promise<Order>} */
-  get: (id, options) => request(`/orders/${encodeURIComponent(id)}`, options),
 }
 
 export const quoteResponseService = {
-  /** Opens a quote owned by the signed-in customer. */
-  getMine: (id, options) => request(`/quotes/${encodeURIComponent(id)}`, options),
-  /** Opens a quote with a guest link token. */
-  getPublic: (id, token, options) => request(`/quotes/${encodeURIComponent(id)}/public?token=${encodeURIComponent(token)}`, options),
-  /** Accepts, declines, or asks for changes. The server validates expiry and supersession. */
-  respond: (id, body, token, options) => request(`/quotes/${encodeURIComponent(id)}/respond${token ? `?token=${encodeURIComponent(token)}` : ''}`, {
-    ...options, method: 'POST', body,
+  getPublic: (id, token, options) => request(`/quotes/${encodeURIComponent(id)}/public?token=${encodeURIComponent(token)}`, { ...options, token: null }),
+  respond: (id, body, token, options) => request(`/quotes/${encodeURIComponent(id)}/respond`, {
+    ...options, method: 'POST', body: { ...body, token }, token: null,
   }),
 }

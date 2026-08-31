@@ -5,12 +5,11 @@ function endpoint(path) { return `${env.apiBaseUrl.replace(/\/$/, '')}/${path.re
    site passing one. Reading it at call time means a token minted mid-session is
    picked up without re-wiring anything.
 
-   The provider is asynchronous: Supabase Auth yields a short-lived access
-   token from the restored session. It was previously a synchronous read
-   of a token held in memory, and leaving it as a default parameter would have
-   put a *Promise* in the Authorization header — a promise is truthy, so this
-   would have failed as `Bearer [object Promise]` rather than as a missing
-   token. It is awaited explicitly below. */
+   The provider is asynchronous. It was previously a synchronous read of a token
+   held in memory, and leaving it as a default parameter would have put a
+   *Promise* in the Authorization header — a promise is truthy, so this would
+   have failed as `Bearer [object Promise]` rather than as a missing token. It
+   is awaited explicitly below. */
 let authTokenProvider = async () => null
 export function setAuthTokenProvider(provider) { authTokenProvider = provider || (async () => null) }
 

@@ -1,186 +1,166 @@
 import { describe, expect, it } from 'vitest'
-import { createAuthenticator, requireAdmin, requireAuth, requireCustomer } from '../server/auth.js'
+import { createAuthenticator, requireAdmin } from '../server/auth.js'
 import { serverConfig } from '../server/config.js'
-import { FAKE_ANON_KEY, FAKE_SERVICE_ROLE_KEY, FAKE_SUPABASE_URL, serverEnv } from './helpers/supabase.js'
-
-/* Supabase Auth token verification.
- *
- * A real Supabase token cannot be minted here — the project requires email
- * confirmation, so obtaining one needs a reachable inbox and a browser. What is
- * fully testable, and is what actually protects the API, is our own verification
- * seam: `getUser(token)` is injectable, production passes `supabase.auth.getUser`.
- */
+import { LOGIN_FAILURE_MESSAGE } from '../server/admins.js'
+import { hashToken } from '../server/sessions.js'
+import { adminUsersJson, ownerActor, serverEnv } from './helpers/env.js'
 
 const bearer = (token) => new Request('https://api.test/x', { headers: { authorization: `Bearer ${token}` } })
 
-function harness({ profile = null, user = null, getUser } = {}) {
-  const authUser = user || {
-    id: 'auth-user-1',
-    email: 'ada@example.com',
-    email_confirmed_at: '2026-01-01T00:00:00Z',
-  }
+function sessionDb(row) {
   const queries = []
   const db = {
     query: async (statement, values) => {
       queries.push({ statement, values })
-      return profile ? [profile] : []
+      if (statement.includes('DELETE FROM')) return []
+      if (statement.includes('FROM public.admin_sessions') && statement.includes('WHERE token_hash')) {
+        return row && row.token_hash === values[0] ? [row] : []
+      }
+      return []
     },
   }
-  const lookup = getUser || (async (token) => {
-    if (!token || token === 'invalid' || token === 'expired') return null
-    return authUser
-  })
-  const authenticate = createAuthenticator({ db, getUser: lookup })
-  return { authenticate, queries, authUser }
+  return { db, queries }
 }
 
-describe('Supabase Auth token verification', () => {
-  it('accepts a token that getUser resolves and loads the profile from the database', async () => {
-    const profile = { id: 'p1', auth_user_id: 'auth-user-1', role: 'customer', full_name: 'Ada' }
-    const kit = harness({ profile })
-    const actor = await kit.authenticate(bearer('valid-access-token'))
-    expect(actor.authUserId).toBe('auth-user-1')
-    expect(actor.profile).toEqual(profile)
-    expect(actor.email).toBe('ada@example.com')
-    expect(actor.emailVerified).toBe(true)
-    expect(kit.queries[0].statement).toContain('FROM public.user_profiles')
-    expect(kit.queries[0].values).toEqual(['auth-user-1'])
-  })
-
+describe('administrator session authentication', () => {
   it('returns null rather than throwing when no token is presented', async () => {
-    const kit = harness()
-    expect(await kit.authenticate(new Request('https://api.test/x'))).toBeNull()
+    const { db } = sessionDb()
+    const authenticate = createAuthenticator({ db })
+    expect(await authenticate(new Request('https://api.test/x'))).toBeNull()
   })
 
-  it('rejects a token that getUser does not resolve', async () => {
-    const kit = harness()
-    await expect(kit.authenticate(bearer('invalid'))).rejects.toMatchObject({ status: 401, code: 'invalid_session' })
-  })
-
-  it('rejects an expired or thrown lookup', async () => {
-    const kit = harness({
-      getUser: async () => { throw new Error('expired') },
+  it('restores a live hashed session as { actorId, username, role: "owner" }', async () => {
+    const token = 'live-admin-token'
+    const { db, queries } = sessionDb({
+      id: 'sess-1',
+      administrator_id: ownerActor.actorId,
+      username: 'ada',
+      token_hash: hashToken(token),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      revoked_at: null,
     })
-    await expect(kit.authenticate(bearer('expired'))).rejects.toMatchObject({ status: 401, code: 'invalid_session' })
+    const authenticate = createAuthenticator({ db, admins: [{ id: ownerActor.actorId, username: 'ada' }] })
+    const actor = await authenticate(bearer(token))
+    expect(actor).toMatchObject({ actorId: ownerActor.actorId, username: 'ada', role: 'owner' })
+    expect(queries.some((entry) => entry.statement.includes('FROM public.admin_sessions'))).toBe(true)
+    expect(queries.find((entry) => entry.statement.includes('token_hash')).values[0]).toBe(hashToken(token))
+    expect(queries.find((entry) => entry.statement.includes('token_hash')).values[0]).not.toBe(token)
   })
 
-  it('rejects a user object with no id', async () => {
-    const kit = harness({ getUser: async () => ({ email: 'ada@example.com' }) })
-    await expect(kit.authenticate(bearer('no-sub'))).rejects.toMatchObject({ status: 401 })
+  it('rejects an unknown, expired, or revoked token with the same 401', async () => {
+    const { db } = sessionDb()
+    const authenticate = createAuthenticator({ db })
+    await expect(authenticate(bearer('missing'))).rejects.toMatchObject({ status: 401, code: 'invalid_session' })
+  })
+
+  it('requires a database client', () => {
+    expect(() => createAuthenticator({})).toThrow(/database client/)
   })
 })
 
-describe('authorisation is decided by the database, never by the token', () => {
-  it('ignores a role claim on the Auth user and uses the stored profile role', async () => {
-    const profile = { id: 'p1', auth_user_id: 'auth-user-1', role: 'customer' }
-    const kit = harness({
-      profile,
-      user: {
-        id: 'auth-user-1',
-        email: 'ada@example.com',
-        email_confirmed_at: '2026-01-01T00:00:00Z',
-        app_metadata: { role: 'admin' },
-        user_metadata: { role: 'owner', is_admin: true },
-      },
-    })
-    const request = bearer('valid-access-token')
-    const actor = await kit.authenticate(request)
-
-    expect(actor.profile.role).toBe('customer')
-    await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'owner_required' })
-  })
-
-  it('admits a caller whose stored role is owner', async () => {
-    const kit = harness({ profile: { id: 'p2', auth_user_id: 'auth-user-1', role: 'owner' } })
-    const request = bearer('valid-access-token')
-    const actor = await requireAdmin(request, kit.authenticate)
-    expect(actor.profile.role).toBe('owner')
-  })
-
-  it('requires a completed profile for customer routes, and any session for authenticated ones', async () => {
-    const kit = harness({ profile: null })
-    const request = bearer('valid-access-token')
-    const actor = await requireAuth(request, kit.authenticate)
-    expect(actor.profile).toBeNull()
-    await expect(requireCustomer(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'profile_required' })
-    await expect(requireAdmin(request, kit.authenticate)).rejects.toMatchObject({ status: 403, code: 'owner_required' })
-  })
-})
-
-describe('a customer cannot promote themselves through the API', () => {
+describe('administrator authorisation', () => {
   const silentLogger = { info() {}, error() {} }
   const apiRequest = (path, options) => new Request(`https://api.motion.test${path}`, options)
-  const json = (body) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-  it('drops a role sent to profile creation and stores customer', async () => {
-    const { createApi } = await import('../server/api.js')
-    const seen = []
-    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'p', role: 'customer' }] } }
-    const api = createApi({
-      db,
-      authenticate: async () => ({ authUserId: 'auth-1', profile: null }),
-      logger: silentLogger,
-    })
-
-    await api(apiRequest('/api/me', json({ fullName: 'Mallory', role: 'admin', profile: { role: 'admin' } })))
-
-    const insert = seen.find(entry => entry.statement.includes('INSERT INTO public.user_profiles'))
-    expect(insert, 'no profile insert was issued').toBeTruthy()
-    expect(insert.values).toContain('customer')
-    expect(insert.values).not.toContain('admin')
+  it('requires a session for management routes', async () => {
+    const request = new Request('https://api.test/x')
+    await expect(requireAdmin(request, async () => null)).rejects.toMatchObject({ status: 401, code: 'authentication_required' })
   })
 
-  it('cannot change its own role through the profile PATCH', async () => {
-    const { createApi } = await import('../server/api.js')
-    const seen = []
-    const db = { query: async (statement, values) => { seen.push({ statement, values }); return [{ id: 'p', role: 'customer' }] } }
-    const api = createApi({
-      db,
-      authenticate: async () => ({ authUserId: 'auth-1', profile: { id: 'p', role: 'customer' } }),
-      logger: silentLogger,
-    })
-
-    await api(apiRequest('/api/me', { ...json({ fullName: 'Mallory', role: 'admin' }), method: 'PATCH' }))
-
-    const update = seen.find(entry => entry.statement.includes('UPDATE public.user_profiles'))
-    expect(update).toBeTruthy()
-    expect(update.statement).not.toMatch(/SET[^)]*\brole\s*=/)
-    expect(update.values).not.toContain('admin')
+  it('refuses a non-owner actor', async () => {
+    const request = bearer('t')
+    await expect(requireAdmin(request, async () => ({ actorId: 'x', username: 'guest', role: 'customer' })))
+      .rejects.toMatchObject({ status: 403, code: 'owner_required' })
   })
 
-  it('refuses an admin route to a customer session', async () => {
+  it('admits an owner actor', async () => {
+    const request = bearer('t')
+    await expect(requireAdmin(request, async () => ownerActor)).resolves.toMatchObject(ownerActor)
+  })
+
+  it('refuses an admin route to a customer-shaped actor', async () => {
     const { createApi } = await import('../server/api.js')
     const api = createApi({
       db: { query: async () => [] },
-      authenticate: async () => ({ authUserId: 'auth-1', profile: { id: 'p', role: 'customer' } }),
+      authenticate: async () => ({ actorId: 'auth-1', username: 'mallory', role: 'customer' }),
       logger: silentLogger,
     })
     const response = await api(apiRequest('/api/admin/products'))
     expect(response.status).toBe(403)
   })
+
+  it('does not create customer profiles or expose /api/me', async () => {
+    const { createApi } = await import('../server/api.js')
+    const seen = []
+    const api = createApi({
+      db: { query: async (statement, values) => { seen.push({ statement, values }); return [] } },
+      authenticate: async () => null,
+      logger: silentLogger,
+    })
+    const created = await api(apiRequest('/api/me', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ fullName: 'Mallory', role: 'admin' }),
+    }))
+    expect(created.status).toBe(404)
+    expect(seen.some((entry) => entry.statement.includes('user_profiles'))).toBe(false)
+  })
 })
 
 describe('server configuration is validated at startup', () => {
-  it('accepts a correctly formed Supabase URL and service_role key', () => {
+  it('accepts a local DATABASE_URL without administrator credentials outside production', () => {
     expect(() => serverConfig(serverEnv)).not.toThrow()
     const config = serverConfig(serverEnv)
-    expect(config.supabaseUrl).toBe(FAKE_SUPABASE_URL)
-    expect(config.supabaseServiceRoleKey).toBe(FAKE_SERVICE_ROLE_KEY)
+    expect(config.databaseUrl).toBe(serverEnv.DATABASE_URL)
+    expect(config.admins).toEqual([])
+    expect(config.adminSessionHours).toBe(8)
   })
 
-  it('rejects a Supabase URL that carries a path', () => {
-    expect(() => serverConfig({ ...serverEnv, SUPABASE_URL: `${FAKE_SUPABASE_URL}/auth/v1` }))
-      .toThrow(/origin with no path/)
+  it('fails closed in production without ADMIN_USERS_JSON', () => {
+    expect(() => serverConfig({ ...serverEnv, NODE_ENV: 'production' }))
+      .toThrow(/ADMIN_USERS_JSON/)
   })
 
-  it('rejects the publishable key in the service_role slot', () => {
-    expect(() => serverConfig({ ...serverEnv, SUPABASE_SERVICE_ROLE_KEY: FAKE_ANON_KEY }))
-      .toThrow(/not the service_role key/)
+  it('accepts a valid administrator list in production when the trusted-client header is set', () => {
+    const config = serverConfig({
+      ...serverEnv,
+      NODE_ENV: 'production',
+      ADMIN_USERS_JSON: adminUsersJson(),
+      API_TRUSTED_CLIENT_HEADER: 'none',
+    })
+    expect(config.admins).toHaveLength(1)
+    expect(config.admins[0].username).toBe('ada')
   })
 
-  it('refuses to build an authenticator without a lookup', () => {
-    const db = { query: async () => [] }
-    expect(() => createAuthenticator({ db })).toThrow(/Supabase Auth client/)
-    expect(() => createAuthenticator({ getUser: async () => null })).toThrow(/database client/)
+  it('requires the restricted role for a production Neon runtime URL', () => {
+    const base = {
+      ...serverEnv,
+      NODE_ENV: 'production',
+      ADMIN_USERS_JSON: adminUsersJson(),
+      API_TRUSTED_CLIENT_HEADER: 'none',
+    }
+    expect(() => serverConfig({
+      ...base,
+      DATABASE_URL: 'postgresql://neondb_owner:secret@ep-example-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
+    })).toThrow(/motion_app/)
+    expect(() => serverConfig({
+      ...base,
+      DATABASE_URL: 'postgresql://motion_app:secret@ep-example-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
+    })).not.toThrow()
+  })
+
+  it('rejects obsolete Supabase and owner-email variables', () => {
+    expect(() => serverConfig({ ...serverEnv, SUPABASE_URL: 'https://example.supabase.co' }))
+      .toThrow(/obsolete/)
+    expect(() => serverConfig({ ...serverEnv, OWNER_ALLOWED_EMAILS: 'a@b.c' }))
+      .toThrow(/obsolete/)
+  })
+})
+
+describe('login failures stay neutral', () => {
+  it('uses one message for every failed administrator login', () => {
+    expect(LOGIN_FAILURE_MESSAGE).toMatch(/do not match a Motion staff account/)
+    expect(LOGIN_FAILURE_MESSAGE.toLowerCase()).not.toContain('username')
+    expect(LOGIN_FAILURE_MESSAGE.toLowerCase()).not.toContain('password')
   })
 })

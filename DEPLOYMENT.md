@@ -10,29 +10,21 @@ Connect the GitHub repository to a Render Static Site and use the production bra
 
 `render.yaml` records the same configuration. The rewrite is required so direct visits to `/shop`, `/product/example`, and `/manager` load React Router rather than a static-host 404.
 
-Configure only browser-safe `VITE_*` variables in the static site. `VITE_API_BASE_URL` is mandatory in production and must be the absolute HTTPS URL of the secure API; it must not be `/api`. Variables are embedded at build time, so rebuild after changing them. Assets emitted by Vite are fingerprinted and cache-friendly. Production source maps are disabled to avoid publishing readable source maps.
+Configure only browser-safe `VITE_*` variables in the static site: `VITE_APP_NAME`, `VITE_APP_URL`, and `VITE_API_BASE_URL`. `VITE_API_BASE_URL` is mandatory in production and must be the absolute HTTPS URL of the secure API; it must not be `/api`. Variables are embedded at build time, so rebuild after changing them. Assets emitted by Vite are fingerprinted and cache-friendly. Production source maps are disabled to avoid publishing readable source maps.
 
 ### Variables Render prompts for
 
-`render.yaml` declares frontend and API secrets with `sync: false`, so **Render asks for each value during the first Blueprint import** rather than deploying without them. No value is committed.
+`render.yaml` declares API secrets with `sync: false`, so **Render asks for each value during the first Blueprint import** rather than deploying without them. No value is committed.
 
-| Variable | Value |
-| --- | --- |
-| `VITE_SUPABASE_URL` | The Supabase project origin, for example `https://<project-ref>.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | The publishable (anon) key. **Never** the service_role key |
-| `VITE_SUPABASE_GOOGLE` | `true` to show the optional Google button |
+The frontend service does not prompt for secrets. `VITE_API_BASE_URL` and `VITE_APP_URL` are resolved from Render service URLs.
 
-`VITE_API_BASE_URL` is **not** prompted — Render resolves it from the API service.
-
-Three things worth knowing:
-
-- **Email and password is always available.** `VITE_SUPABASE_GOOGLE` only controls whether the Google button is *also* offered; it never disables the email flow.
-- **It defaults to shown.** Only the exact string `false` hides the button — leaving the prompt blank still shows it. If Google is not enabled on the Supabase project, set `false` explicitly rather than leaving it empty.
-- **Changing any `VITE_*` variable needs a new deployment.** Vite embeds these at build time, so editing one in the Render dashboard changes nothing until the site is rebuilt.
+**Changing any `VITE_*` variable needs a new deployment.** Vite embeds these at build time, so editing one in the Render dashboard changes nothing until the site is rebuilt.
 
 **Do not deploy with a fake or `localhost` API URL.** The build will succeed and the deploy will go green, but `assertRuntimeConfig()` throws before React renders and the site is a blank page — which reads as a build problem when it is a configuration one. `VITE_API_BASE_URL` must point at a real, reachable HTTPS API before the first useful deployment.
 
-Never place `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, passwords, storage keys or payment credentials in the static site's environment. Those belong to the API runtime; anything given a `VITE_` name ships to every visitor in the bundle.
+Never place `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `ADMIN_USERS_JSON`, passwords, hashes, storage keys or payment credentials in the static site's environment. Those belong to the API runtime or a controlled operator machine; anything given a `VITE_` name ships to every visitor in the bundle.
+
+This change must not be deployed to live Render until another engineer has audited the local diff.
 
 ## Secure API
 
@@ -56,14 +48,14 @@ Render assigns both public URLs at Blueprint creation and connects them with `fr
 
 | Prompt | Value |
 | --- | --- |
-| `DATABASE_URL` | **SECRET.** Supabase **session pooler** URI (port 5432), `sslmode=require` |
-| `SUPABASE_URL` | The same public origin as `VITE_SUPABASE_URL` |
-| `SUPABASE_SERVICE_ROLE_KEY` | **SECRET.** The service_role JWT from Supabase Settings → API |
-| `OWNER_ALLOWED_EMAILS` | Exactly two owner addresses, comma-separated |
+| `DATABASE_URL` | **SECRET.** Neon **pooled** `motion_app` runtime URI, `sslmode=require` |
+| `ADMIN_USERS_JSON` | **SECRET.** JSON array of administrators with scrypt `passwordHash` values |
 
-`API_ALLOWED_ORIGINS` and `VITE_API_BASE_URL` are **not** prompted — Render resolves both. `API_TRUSTED_CLIENT_HEADER` is set to `none` in the Blueprint.
+`ADMIN_SESSION_HOURS` defaults to `8` in the Blueprint. `API_ALLOWED_ORIGINS` and `VITE_API_BASE_URL` are **not** prompted — Render resolves both. `API_TRUSTED_CLIENT_HEADER` is set to `none` in the Blueprint.
 
-**The database password and the service_role key must never be pasted into chat, a commit, the static site, or any `VITE_*` variable.** Everything with a `VITE_` name is compiled into the bundle and served to every visitor.
+Do **not** put `MIGRATION_DATABASE_URL` on either Render service. Migrations are applied from a controlled machine, never on deploy.
+
+**The database password and administrator hashes must never be pasted into chat, a commit, the static site, or any `VITE_*` variable.** Everything with a `VITE_` name is compiled into the bundle and served to every visitor.
 
 ### Rate-limit identity on Render — the trade-off
 
@@ -73,32 +65,33 @@ Render assigns both public URLs at Blueprint creation and connects them with `fr
 
 What this means in practice:
 
-- **Authenticated callers are limited per session.** The session is checked *before* any client-supplied header, so spoofing a header cannot widen or escape a session's bucket.
-- **Anonymous callers are not rate limited by this service.** Pooling them into one bucket would throttle the entire site as a single visitor, which is worse.
+- **Callers with a trusted client header are limited per client.** Bearer tokens are never used as a bucket key because public endpoints do not verify them.
+- **Anonymous mutations are bounded per endpoint** by `API_ANONYMOUS_MUTATION_MAX` (20 per minute in Render). This limits cost but is deliberately not a replacement for an edge WAF with a verified client address.
 - Render's platform DDoS protection sits in front regardless.
 
 If Render later documents a header it overwrites, set `API_TRUSTED_CLIENT_HEADER` to that header's name and anonymous limiting begins working with no code change.
 
 ### Before real API calls work
 
-1. **Apply the migrations to the Supabase project.** They are never run on deploy — a deploy that silently alters a schema is how a production database gets changed by accident. Prefer the **Direct** connection when IPv6 works; on IPv4-only networks use the **Session Pooler** (port **5432**). Never the Transaction Pooler (port **6543**). See `SUPABASE.md`.
-2. **Add the frontend's Render URL to Supabase Auth redirect URLs** once Render has created it. Sign-in fails until you do.
-3. **Do not change live Render variables or deploy as part of a code-only migration.** Swap DATABASE_URL and Auth variables in a later, deliberate cutover.
+1. **Apply the migrations to Neon** from a controlled machine using `MIGRATION_DATABASE_URL` (direct, unpooled). They are never run on deploy. Pooled URLs are rejected because the runner uses a session advisory lock. See `ENVIRONMENT.md`.
+2. **Set `ADMIN_USERS_JSON`** with distinct administrator hashes from `scripts/hash-admin-password.js`. Production refuses to start without a valid list.
+3. **Set the Neon `motion_app` password**, then configure Render `DATABASE_URL` with that pooled role URI. Keep the database-owner direct URI only for controlled migrations.
+4. **Do not change live Render variables or deploy as part of this local implementation.** Another engineer audits the diff first.
 
 ### Free plan
 
 Free web services sleep when idle and cold-start on the next request, which can take tens of seconds. That is fine for first testing, but **not appropriate for a live checkout or payment flow** — a customer will not wait, and a payment webhook arriving at a sleeping instance is a problem you do not want to debug. Move `motion-api` to a paid instance before taking real orders.
 
-The handler uses a server-side Postgres connection (`pg`) and verifies Supabase access tokens with `auth.getUser`. The browser never receives `DATABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY`.
+The handler uses a server-side Postgres pool (`pg`) against Neon and verifies administrator sessions from hashed rows in PostgreSQL. The browser never receives `DATABASE_URL` or `ADMIN_USERS_JSON`.
 
 ### Rate-limit identity
 
 Set `API_TRUSTED_CLIENT_HEADER` to the header your API runtime **overwrites** with the real client address (for example `x-real-ip`, or the platform's own forwarding header). Raw `X-Forwarded-For` is client-supplied and must not be named unless the runtime is known to replace it — otherwise a caller rotates the header and bypasses the limiter entirely.
 
-The server refuses to start when `NODE_ENV=production` and this variable is unset. When it is unset outside production, authenticated callers are still bucketed per session, while anonymous callers are not limited: they cannot be distinguished, and pooling them into one bucket would rate-limit the whole site as if it were a single visitor.
+The server refuses to start when `NODE_ENV=production` and this variable is unset. When no trusted header is available, the server still applies the bounded shared mutation limit, but read traffic cannot be identified reliably inside the application.
 
 The in-memory limiter is per instance. A runtime that scales to several instances needs a shared store before it provides a real guarantee.
 
 ## Database migrations
 
-Apply `db/migrations` in filename order to the intended Supabase project using a controlled migration process, then promote tested changes. Do not edit an applied migration; create a new numbered migration. The runner uses one `pg.Client` and an advisory lock. Direct (`db.<ref>.supabase.co:5432`) is preferred when IPv6 works; Session Pooler port **5432** is the supported IPv4 fallback. Transaction Pooler port **6543** must never be used for the migration runner. Rehearsal commands are in `SUPABASE.md`.
+Apply `db/migrations` in filename order to the intended Neon database using a controlled migration process, then promote tested changes. Do not edit an applied migration; create a new numbered migration. Migrations 0001–0014 are immutable. The runner uses one `pg.Client` and an advisory lock on `MIGRATION_DATABASE_URL` (direct). A pooled `DATABASE_URL` is not accepted for migrations. Local development may fall back to a direct localhost `DATABASE_URL`.

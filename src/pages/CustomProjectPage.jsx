@@ -5,7 +5,6 @@ import { Field, ChoiceGroup } from '../components/ui/Form'
 import { Breadcrumbs } from '../components/ui/Navigation'
 import { useToast } from '../components/ToastProvider'
 import { quoteService } from '../services/quoteService'
-import { fileService } from '../services/fileService'
 
 /* Project types drive progressive disclosure: each type declares only the extra
    questions it actually needs, so the first screen never asks for dimensions on a
@@ -56,8 +55,6 @@ export function CustomProjectPage() {
   const [searchParams] = useSearchParams()
   const notify = useToast()
   const [form, setForm] = useState(emptyForm)
-  const [files, setFiles] = useState([])
-  const [fileError, setFileError] = useState(null)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [reference, setReference] = useState(null)
@@ -79,28 +76,13 @@ export function CustomProjectPage() {
 
   const selected = projectTypes.find(type => type.value === form.projectType)
   const extras = selected?.extras || []
-  const set = (name) => (event) => setForm(current => ({ ...current, [name]: event.target.value }))
-
-  const onFiles = (event) => {
-    const chosen = Array.from(event.target.files || [])
-    const rejected = chosen.find(file => !fileService.supportedTypes.includes(file.type) || file.size > fileService.maxBytes)
-    if (rejected) {
-      setFileError(`${rejected.name} was not accepted. Use JPEG, PNG, WebP or PDF up to 25 MB.`)
-      setFiles([])
-      event.target.value = ''
-      return
-    }
-    setFileError(null)
-    setFiles(chosen)
-  }
+  const set = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.value }))
 
   /* Type-specific answers are sent as a structured document, so the backend keeps
-     them queryable rather than buried in prose. Uploads are listed by name only
-     until object storage is provisioned; nothing pretends a file was stored. */
+     them queryable rather than buried in prose. */
   const buildAnswers = () => {
     const answers = {}
     for (const key of extras) if (form[key]) answers[key] = form[key]
-    if (files.length) answers.filesPending = files.map(file => file.name).join(', ')
     if (productHandoff) {
       answers.productSlug = productHandoff.slug
       answers.productQuantity = productHandoff.quantity
@@ -127,7 +109,6 @@ export function CustomProjectPage() {
       })
       setReference(result.request_number)
       setForm(emptyForm)
-      setFiles([])
       notify('Your project request has been submitted.', 'success')
     } catch (error) {
       if (error.details) setErrors(Object.fromEntries(Object.entries(error.details).map(([key, value]) => [key, value[0]])))
@@ -144,8 +125,7 @@ export function CustomProjectPage() {
           <Breadcrumbs trail={[{ label: 'Custom project' }]} />
           <h1 className="t-h1 page-head__title">Request received</h1>
           <p className="t-body-lg t-muted t-measure">
-            Your reference is <strong>{reference}</strong>. Keep it — you can quote it when
-            you contact us, and it will appear in your account once you sign in.
+            Your reference is <strong>{reference}</strong>. Keep it — quote it when you contact us.
           </p>
           <div className="cluster">
             <Button to="/work" variant="secondary">See our work</Button>
@@ -246,15 +226,11 @@ export function CustomProjectPage() {
               <Field label="Preferred completion date" type="date" value={form.completionDate} onChange={set('completionDate')} optional />
 
               <div className="field">
-                <label className="field__label" htmlFor="artwork">Artwork or reference images <span className="field__optional">(optional)</span></label>
-                <p className="field__hint" id="artwork-hint">JPEG, PNG, WebP or PDF, up to 25 MB each.</p>
-                <input id="artwork" className="input" type="file" multiple accept={fileService.supportedTypes.join(',')} onChange={onFiles} aria-describedby="artwork-hint artwork-status" />
-                <p className="field__hint" id="artwork-status">
-                  {files.length > 0
-                    ? `${files.length} file${files.length > 1 ? 's' : ''} selected. File uploading is not yet switched on — we will list them with your request and ask you to send them directly.`
-                    : 'File uploading is not yet switched on; selected files are recorded by name with your request.'}
+                <p className="t-h4">Artwork or reference images</p>
+                <p className="t-caption">
+                  File uploading is not available yet. Send artwork or reference files directly
+                  after you submit this request, quoting the reference we give you.
                 </p>
-                {fileError && <p className="field__error" role="alert">{fileError}</p>}
               </div>
 
               <fieldset className="stack" style={{ border: 'none', padding: 0, margin: 0 }}>

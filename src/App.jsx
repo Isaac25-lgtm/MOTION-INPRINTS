@@ -1,6 +1,6 @@
 import { Route, Routes, Navigate } from 'react-router-dom'
-import { AdminLayout, CustomerLayout, PublicLayout } from './layouts/Layouts'
-import { RequireOwner, RequireAuth } from './auth/RouteGuards'
+import { AdminLayout, PublicLayout } from './layouts/Layouts'
+import { RequireOwner } from './auth/RouteGuards'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { HomePage } from './pages/HomePage'
 import { ShopPage, ProductDetailPage } from './pages/ShopPage'
@@ -13,32 +13,21 @@ import { LegalPage } from './pages/LegalPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage, OrderConfirmedPage } from './pages/CheckoutPage'
 import { QuoteViewPage } from './pages/QuoteViewPage'
-import { AccountQuotesPage } from './pages/AccountQuotesPage'
 import { StylePreviewPage } from './pages/StylePreviewPage'
-import {
-  AccountOverviewPage, AccountOrdersPage, AccountOrderDetailPage,
-  AccountReorderPage, AccountProfilePage,
-} from './pages/account/AccountPages'
 import {
   AdminDashboardPage, AdminOrdersPage, AdminOrderDetailPage,
   AdminCustomersPage, AdminCustomerDetailPage, AdminReportsPage, AdminSectionPage,
 } from './pages/admin/AdminPages'
 import { adminService } from './services/adminService'
 import { ManagerSignInPage } from './pages/ManagerSignInPage'
-import { ManagerActivatePage } from './pages/ManagerActivatePage'
 import { TrackOrderPage } from './pages/TrackOrderPage'
-import { SignInPage, SignUpPage, ResetPasswordPage } from './pages/AuthPages'
 import { AdminContentPage, AdminFilesPage, AdminSettingsPage } from './pages/admin/AdminManagePages'
 import { AdminProductFormPage, AdminCategoryFormPage, AdminProjectFormPage } from './pages/admin/AdminForms'
 
-/* Legal pages render owner-published CMS content, or say plainly that it has not
-   been published. Registered so the footer's links resolve rather than 404. */
 const legalRoutes = [
   ['/privacy', 'Privacy policy', 'privacy'],
   ['/terms', 'Terms and conditions', 'terms'],
 ]
-/* Admin sections that are list views over an existing service. Kept declarative
-   so each one is a data description rather than another near-identical page. */
 const adminSections = [
   {
     path: '/manager/products', title: 'Products', description: 'Catalogue and pricing.',
@@ -89,41 +78,17 @@ export function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/track-order" element={<TrackOrderPage />} />
-        <Route path="/sign-in" element={<SignInPage />} />
-        <Route path="/sign-up" element={<SignUpPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
         {legalRoutes.map(([path, title, section]) => (
           <Route key={path} path={path} element={<LegalPage title={title} section={section} />} />
         ))}
-        {/* Internal only: absent from the production bundle. */}
         {import.meta.env.DEV && <Route path="/internal/style-preview" element={<StylePreviewPage />} />}
       </Route>
 
-      <Route element={<RequireAuth><CustomerLayout /></RequireAuth>}>
-        <Route path="/account" element={<AccountOverviewPage />} />
-        <Route path="/account/orders" element={<AccountOrdersPage />} />
-        <Route path="/account/orders/:id" element={<AccountOrderDetailPage />} />
-        <Route path="/account/orders/:id/reorder" element={<AccountReorderPage />} />
-        <Route path="/account/quotes" element={<AccountQuotesPage />} />
-        <Route path="/account/quotes/:id" element={<QuoteViewPage account />} />
-        <Route path="/account/profile" element={<AccountProfilePage />} />
-      </Route>
-
-      {/* Migration 0013 renamed the point-of-sale slug to business-systems.
-          Existing bookmarks and any shared links must not become 404s. */}
       <Route path="/services/business-point-of-sale-systems" element={<Navigate to="/services/business-systems" replace />} />
       <Route path="/shop/business-point-of-sale-systems" element={<Navigate to="/shop/business-systems" replace />} />
 
-      {/* Staff sign-in. Public by necessity — someone has to be able to reach it
-          before they have a session — and unlinked by design. Obscurity is not
-          the protection; every management API verifies session and role. */}
       <Route path="/manager" element={<ManagerSignInPage />} />
-      {/* Unlinked from anywhere public. Creates an ordinary email/password
-          account and grants nothing — authorisation happens server-side at
-          sign-in, and this page cannot tell whether an address is approved. */}
-      <Route path="/manager/activate" element={<ManagerActivatePage />} />
 
-      {/* Compatibility only, for links that predate /manager. */}
       <Route path="/admin" element={<Navigate to="/manager/dashboard" replace />} />
       <Route path="/admin/*" element={<Navigate to="/manager/dashboard" replace />} />
 
@@ -134,7 +99,7 @@ export function App() {
         <Route path="/manager/customers" element={<AdminCustomersPage />} />
         <Route path="/manager/customers/:id" element={<AdminCustomerDetailPage />} />
         <Route path="/manager/reports" element={<AdminReportsPage />} />
-        {adminSections.map(section => (
+        {adminSections.map((section) => (
           <Route
             key={section.path}
             path={section.path}

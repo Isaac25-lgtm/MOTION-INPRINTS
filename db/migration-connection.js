@@ -1,18 +1,36 @@
-/* Which DATABASE_URL the migration runner will accept.
+/* Which connection the migration runner will accept.
 
-   Direct db.<project-ref>.supabase.co:5432 is preferred when IPv6 works.
-   Session Pooler *.pooler.supabase.com:5432 is the supported IPv4 fallback.
-   Transaction Pooler port 6543 is never accepted. */
+   Migrations take a session advisory lock, so they must use a direct Postgres
+   connection. Neon pooled endpoints (-pooler host, pgbouncer=true, port 6543)
+   are rejected. Local unpooled URLs are allowed as a DATABASE_URL fallback. */
 
-function isSupabasePoolerHost(hostname) {
-  const host = String(hostname || '').toLowerCase()
-  return host === 'pooler.supabase.com' || host.endsWith('.pooler.supabase.com')
+export function isPooledNeonUrl(connectionString) {
+  let url
+  try {
+    url = new URL(connectionString)
+  } catch {
+    return false
+  }
+  const host = url.hostname.toLowerCase()
+  const port = url.port || '5432'
+  if (port === '6543') return true
+  if (host.includes('-pooler') || host.includes('pooler.')) return true
+  if (url.searchParams.get('pgbouncer') === 'true') return true
+  return false
+}
+
+export function isDirectLocalUrl(connectionString) {
+  try {
+    const url = new URL(connectionString)
+    const host = url.hostname.toLowerCase()
+    return (host === 'localhost' || host === '127.0.0.1' || host === '::1') && !isPooledNeonUrl(connectionString)
+  } catch {
+    return false
+  }
 }
 
 /**
- * Throws if the URI is the Transaction Pooler (port 6543) or a pooler on any
- * port other than 5432. Direct hosts and Session Pooler :5432 are allowed.
- * Unparseable strings are left for connect() to fail with a clearer error.
+ * Throws if the URI cannot hold a session advisory lock.
  */
 export function assertMigrationConnection(connectionString) {
   let url
@@ -22,23 +40,35 @@ export function assertMigrationConnection(connectionString) {
     return
   }
 
-  const port = url.port || '5432'
-  const pooler = isSupabasePoolerHost(url.hostname)
-
-  if (port === '6543') {
+  if (isPooledNeonUrl(connectionString)) {
     throw new Error(
-      'DATABASE_URL points at the Supabase Transaction Pooler (port 6543).\n'
-      + 'Migrations take an advisory lock on one client and must use Direct\n'
-      + '(db.<project-ref>.supabase.co:5432) or Session Pooler\n'
-      + '(*.pooler.supabase.com:5432). Never port 6543.\n'
-      + 'See SUPABASE.md.',
+      'Migrations must use a direct, unpooled Postgres connection (MIGRATION_DATABASE_URL).\n'
+      + 'Pooled Neon URLs cannot hold a session advisory lock.\n'
+      + `Refusing ${url.hostname}:${url.port || 5432}.`,
     )
   }
+}
 
-  if (pooler && port !== '5432') {
+/**
+ * Resolves the migration target. Prefers MIGRATION_DATABASE_URL. Falls back to
+ * DATABASE_URL only when that URL is itself a direct (unpooled) connection —
+ * the local-development case.
+ */
+export function resolveMigrationDatabaseUrl(source = process.env) {
+  const dedicated = String(source.MIGRATION_DATABASE_URL || '').trim()
+  if (dedicated) {
+    assertMigrationConnection(dedicated)
+    return dedicated
+  }
+  const fallback = String(source.DATABASE_URL || '').trim()
+  if (!fallback) {
+    throw new Error('MIGRATION_DATABASE_URL is not set. For local development a direct DATABASE_URL may be used instead.')
+  }
+  if (!isDirectLocalUrl(fallback)) {
     throw new Error(
-      'DATABASE_URL points at a Supabase pooler on a non-session port.\n'
-      + 'Use Session Pooler port 5432. See SUPABASE.md.',
+      'DATABASE_URL fallback is allowed only for a direct localhost Postgres database. Set MIGRATION_DATABASE_URL to the direct, unpooled Neon URL.',
     )
   }
+  assertMigrationConnection(fallback)
+  return fallback
 }

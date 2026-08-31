@@ -99,12 +99,21 @@ describe('duplicate submission', () => {
   it('writes the order, its items and the idempotency key in a single transaction', async () => {
     /* The previous design created the order first and recorded the key afterwards,
        so a failure between the two allowed a retry to produce a second order.
-       Everything must now be in one statement batch. */
+    Everything must now be in one statement batch. */
     let batch = null
+    const queries = []
     const store = {
       query: async (statement) => (statement.includes('FROM public.products') ? [product]
         : statement.startsWith('SELECT 1 FROM') ? [] : []),
-      transaction: async (build) => { batch = build({ query: (sql, params) => ({ sql, params }) }); return batch.map(() => []) },
+      transaction: async (build) => {
+        const planned = build({ query: (sql, params) => {
+          queries.push({ sql, params })
+          return Promise.resolve([])
+        } })
+        await Promise.all(planned)
+        batch = queries
+        return planned.map(() => [])
+      },
     }
     await createOrder(store, {
       items: [{ productId: 'p1', quantity: 2, selection: {} }],

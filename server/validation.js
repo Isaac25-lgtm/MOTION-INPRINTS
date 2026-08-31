@@ -161,10 +161,17 @@ export const projectIntakeSchema = z.object({
 export const proofResponseSchema = z.object({
   action: z.enum(['approve', 'request_changes']),
   comment: z.string().trim().min(2).max(4000).optional(),
+  token: z.string().trim().min(1).max(200),
+  reference: z.string().trim().min(1).max(40),
 }).superRefine((value, context) => {
   if (value.action === 'request_changes' && !value.comment) {
     context.addIssue({ code: 'custom', path: ['comment'], message: 'Tell us what needs changing.' })
   }
+})
+
+export const adminLoginSchema = z.object({
+  username: z.string().trim().min(1).max(80),
+  password: z.string().min(1).max(200),
 })
 
 export const proofUploadSchema = z.object({

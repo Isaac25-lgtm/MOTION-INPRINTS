@@ -23,7 +23,7 @@ export const METRIC_DEFINITIONS = {
   outstanding: 'Total of non-cancelled, non-completed orders that have no successful payment.',
   quoteConversion: 'Accepted quotes ÷ quotes sent to a customer, both counted by send date in the period.',
   averageProductionTime: 'Mean hours from order creation to the first "completed" status entry, for orders completed in the period.',
-  repeatCustomers: 'Customers with more than one non-cancelled order, counted over all time.',
+  repeatCustomers: 'Guest contacts with more than one non-cancelled order, counted over all time by contact_id.',
 }
 
 /** Resolves a named range into explicit bounds, so every query uses the same window. */
@@ -113,9 +113,9 @@ export async function buildReport(db, { range, from, to }) {
 
     db.query(
       `SELECT COUNT(*)::int AS repeat_customers FROM (
-         SELECT customer_id FROM public.orders
-         WHERE customer_id IS NOT NULL AND status_code <> 'cancelled'
-         GROUP BY customer_id HAVING COUNT(*) > 1) repeats`),
+         SELECT contact_id FROM public.orders
+         WHERE contact_id IS NOT NULL AND status_code <> 'cancelled'
+         GROUP BY contact_id HAVING COUNT(*) > 1) repeats`),
   ])
 
   const totals = summary[0] || {}

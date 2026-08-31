@@ -7,10 +7,8 @@ import { IconButton } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { useSiteContent, useContactDetails } from '../content/SiteContentProvider'
 import { useCart } from '../features/cart/CartProvider'
-import { useAuth } from '../auth/AuthProvider'
 
 export const primaryNav = [
-  // Digital leads the navigation as it leads the taxonomy.
   { to: '/services/digital-solutions', label: 'Digital Solutions' },
   { to: '/shop', label: 'Shop' },
   { to: '/services', label: 'Services' },
@@ -19,7 +17,6 @@ export const primaryNav = [
   { to: '/contact', label: 'Contact' },
 ]
 
-/* Announcement renders only when the owner has published one. */
 function Announcement() {
   const { field } = useSiteContent()
   const message = field('announcement', 'default', 'message')
@@ -34,15 +31,13 @@ function Announcement() {
   )
 }
 
-/* Mobile navigation is composed rather than stacked: primary sections set large
-   with travelling arrows, then account, cart and direct contact beneath a rule. */
-function MobileNav({ open, onClose, cartCount, isAuthenticated }) {
+function MobileNav({ open, onClose, cartCount }) {
   const { phone, whatsapp } = useContactDetails()
   return (
     <Drawer open={open} onClose={onClose} title="Menu" side="end">
       <nav className="mobile-nav" aria-label="Main">
         <div className="mobile-nav__primary">
-          {primaryNav.map(item => (
+          {primaryNav.map((item) => (
             <Link key={item.to} to={item.to} onClick={onClose}>
               {item.label}
               <Icon name="arrowRight" size={20} className="arrow" />
@@ -50,7 +45,6 @@ function MobileNav({ open, onClose, cartCount, isAuthenticated }) {
           ))}
         </div>
         <div className="mobile-nav__secondary">
-          <Link to="/account" onClick={onClose}>{isAuthenticated ? 'Your account' : 'Account'}</Link>
           <Link to="/cart" onClick={onClose}>Cart{cartCount ? ` (${cartCount})` : ''}</Link>
           <Link to="/track-order" onClick={onClose}>Track an order</Link>
           <Link to="/custom-project" onClick={onClose}>Start a custom project</Link>
@@ -69,9 +63,7 @@ function MobileNav({ open, onClose, cartCount, isAuthenticated }) {
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  // Cart count is global state, so the badge is correct on every page.
   const { count: cartCount } = useCart()
-  const { isAuthenticated } = useAuth()
 
   return (
     <>
@@ -80,7 +72,7 @@ export function SiteHeader() {
         <div className="container header__inner">
           <Wordmark />
           <nav className="header__nav t-nav" aria-label="Main">
-            {primaryNav.map(item => (
+            {primaryNav.map((item) => (
               <NavLink key={item.to} to={item.to} className="nav-item" end={item.to === '/services'}>
                 {item.label}
               </NavLink>
@@ -88,12 +80,7 @@ export function SiteHeader() {
           </nav>
           <div className="header__actions">
             <IconButton icon="search" label="Search" onClick={() => setSearchOpen(true)} />
-            {/* Sends signed-in visitors to their account and everyone else to
-                sign-in, so the control never leads somewhere that redirects. */}
-            {/* Always "Account", never "Sign in". An account is optional here — a
-                visitor can browse, order and track as a guest — so labelling the
-                icon "Sign in" implies a requirement that does not exist. */}
-            <IconButton icon="account" label="Account" to="/account" />
+            <IconButton icon="clock" label="Track an order" to="/track-order" />
             <IconButton icon="cart" label={`Cart${cartCount ? `, ${cartCount} items` : ', empty'}`} to="/cart" className="cart-indicator">
               {cartCount > 0 && <span className="cart-indicator__count" aria-hidden="true">{cartCount}</span>}
             </IconButton>
@@ -101,7 +88,7 @@ export function SiteHeader() {
           </div>
         </div>
       </header>
-      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} cartCount={cartCount} isAuthenticated={isAuthenticated} />
+      <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} cartCount={cartCount} />
       <SearchPanel open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )

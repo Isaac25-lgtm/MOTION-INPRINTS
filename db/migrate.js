@@ -7,24 +7,21 @@
    re-applying or skipping it is how environments drift apart.
 
    Uses one node-postgres Client over standard TCP and holds
-   pg_advisory_lock for the whole run. Direct (db.<project-ref>.supabase.co:5432)
-   is preferred when IPv6 works. Session Pooler (*.pooler.supabase.com:5432) is
-   the supported IPv4 fallback: session mode assigns one backend connection to
-   this client, so the lock is retained. Transaction Pooler port 6543 must
-   never be used — it cannot hold the lock. See SUPABASE.md.
+   pg_advisory_lock for the whole run. Prefers MIGRATION_DATABASE_URL (direct,
+   unpooled Neon). Falls back to DATABASE_URL only for local development when
+   that URL is itself direct. Pooled Neon URLs are rejected.
 
    `--dry-run` connects and reads only. It does not take the advisory lock, does
    not create schema_migrations, and does not apply files.
 
-   Usage:  node --env-file=.env.supabase db/migrate.js [--dry-run]
-           node --env-file=.env db/migrate.js [--dry-run]
-   Reads DATABASE_URL from the environment. Never takes a connection string as an
-   argument, so it cannot end up in shell history. */
+   Usage:  node --env-file=.env db/migrate.js [--dry-run]
+   Reads connection strings from the environment. Never takes a connection string
+   as an argument, so it cannot end up in shell history. */
 
 import { readdir, readFile } from 'node:fs/promises'
 import pg from 'pg'
 import { sslFor } from '../server/db.js'
-import { assertMigrationConnection } from './migration-connection.js'
+import { resolveMigrationDatabaseUrl } from './migration-connection.js'
 import { runMigrations } from './run-migrations.js'
 
 const MIGRATIONS_DIR = new URL('./migrations/', import.meta.url)
@@ -41,13 +38,13 @@ function describe(connectionString) {
 }
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL
-  if (!databaseUrl) {
-    console.error('DATABASE_URL is not set. Try: node --env-file=.env.supabase db/migrate.js')
+  let databaseUrl
+  try {
+    databaseUrl = resolveMigrationDatabaseUrl(process.env)
+  } catch (error) {
+    console.error(error.message)
     process.exit(1)
   }
-
-  assertMigrationConnection(databaseUrl)
 
   const client = new pg.Client({
     connectionString: databaseUrl,
@@ -55,7 +52,7 @@ async function main() {
   })
 
   await client.connect()
-  const names = (await readdir(MIGRATIONS_DIR)).filter(name => name.endsWith('.sql')).sort()
+  const names = (await readdir(MIGRATIONS_DIR)).filter((name) => name.endsWith('.sql')).sort()
   const files = []
   for (const filename of names) {
     files.push({ filename, contents: await readFile(new URL(filename, MIGRATIONS_DIR), 'utf8') })
@@ -81,5 +78,5 @@ async function main() {
 
 const isEntryPoint = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
 if (isEntryPoint) {
-  main().catch(error => { console.error(error.message); process.exit(1) })
+  main().catch((error) => { console.error(error.message); process.exit(1) })
 }

@@ -13,8 +13,8 @@ import { quoteResponseService } from '../services/orderService'
 /* Customer quote view (Prompt 6.3).
 
    Set as a business document rather than a dashboard: Motion's lockup, a
-   reference, the items, the total, validity and terms. Reachable by an
-   authenticated owner, or by a guest holding the tokenised link. */
+   reference, the items, the total, validity and terms. Reachable by a guest
+   holding the tokenised link. */
 
 const statusTone = { accepted: 'success', declined: 'error', changes_requested: 'warning', sent: 'accent' }
 const statusLabel = {
@@ -26,7 +26,7 @@ const statusLabel = {
   prepared: 'Being prepared',
 }
 
-export function QuoteViewPage({ account = false }) {
+export function QuoteViewPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const token = params.get('token') || ''
@@ -36,11 +36,9 @@ export function QuoteViewPage({ account = false }) {
   const [showChanges, setShowChanges] = useState(false)
 
   const state = useResource(
-    ({ signal }) => account
-      ? quoteResponseService.getMine(id, { signal })
-      : quoteResponseService.getPublic(id, token, { signal }),
-    [id, token, account],
-    { enabled: account || Boolean(token) },
+    ({ signal }) => quoteResponseService.getPublic(id, token, { signal }),
+    [id, token],
+    { enabled: Boolean(token) },
   )
   const quote = state.data
 
@@ -62,10 +60,10 @@ export function QuoteViewPage({ account = false }) {
     }
   }
 
-  if (!account && !token) {
+  if (!token) {
     return (
       <div className="container section">
-        <ErrorState title="This quote link is incomplete" description="Open the quote using the full link we sent you, or sign in to see it in your account." />
+        <ErrorState title="This quote link is incomplete" description="Open the quote using the full link we sent you." />
       </div>
     )
   }

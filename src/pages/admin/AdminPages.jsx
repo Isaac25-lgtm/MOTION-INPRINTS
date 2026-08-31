@@ -407,7 +407,7 @@ export function AdminCustomersPage() {
   return (
     <AdminShell title="Customers" description="Business records only. Authentication data is never shown here.">
       <div className="stack stack--lg">
-        <Field label="Search" hint="Name, phone or company." value={term} onChange={(event) => setTerm(event.target.value)} />
+        <Field label="Search" hint="Name, email, phone or company." value={term} onChange={(event) => setTerm(event.target.value)} />
         <Async state={state} errorTitle="Customers could not be loaded" empty={<EmptyState title="No customers yet" />}>
           {(rows) => (
             <div className="admin-table-wrap">
@@ -416,7 +416,7 @@ export function AdminCustomersPage() {
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.id}>
-                      <td><Link to={`/manager/customers/${row.id}`}>{row.full_name}</Link></td>
+                      <td><Link to={`/manager/customers/${row.id}`}>{row.display_name}</Link></td>
                       <td>{row.company_name || '—'}</td>
                       <td>{row.phone || '—'}</td>
                       <td>{row.order_count}</td>
@@ -441,18 +441,18 @@ export function AdminCustomerDetailPage() {
   if (state.error) return <AdminShell title="Customer"><ErrorState title="This customer could not be loaded" onRetry={state.reload} /></AdminShell>
   if (!state.data) return null
 
-  const { profile, orders, quotes } = state.data
+  const { contact, orders, quotes } = state.data
 
   return (
-    <AdminShell title={profile.full_name} description={profile.company_name || 'Individual customer'}>
+    <AdminShell title={contact.display_name} description={contact.company_name || 'Guest contact'}>
       <div className="stack stack--lg">
         <dl className="detail-list">
-          <div className="detail-list__row"><dt>Phone</dt><dd>{profile.phone || '—'}</dd></div>
-          <div className="detail-list__row"><dt>Company</dt><dd>{profile.company_name || '—'}</dd></div>
-          <div className="detail-list__row"><dt>Customer since</dt><dd>{new Date(profile.created_at).toLocaleDateString()}</dd></div>
+          <div className="detail-list__row"><dt>Email</dt><dd>{contact.original_email || '—'}</dd></div>
+          <div className="detail-list__row"><dt>Phone</dt><dd>{contact.phone || '—'}</dd></div>
+          <div className="detail-list__row"><dt>Company</dt><dd>{contact.company_name || '—'}</dd></div>
+          <div className="detail-list__row"><dt>Customer since</dt><dd>{new Date(contact.created_at).toLocaleDateString()}</dd></div>
         </dl>
-        {/* Authentication material is never selected by the API and so cannot
-            appear here — no hashes, tokens or session data (Prompt 10.4). */}
+        {/* Login-attempt data, password hashes and administrator sessions are never selected. */}
 
         <section className="stack" aria-labelledby="customer-orders">
           <h2 className="t-h3" id="customer-orders">Orders</h2>

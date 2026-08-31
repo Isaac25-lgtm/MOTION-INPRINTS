@@ -124,12 +124,10 @@ export function presentQuote(quote, items = [], changeRequests = []) {
 
 /** Loads a quote with its items and change requests.
  *
- * `customer_id` lives on quote_requests, not on quotes, so it is joined in here.
- * Reading it off the quote row directly yields undefined, which silently fails
- * every ownership check — authenticated customers could never open their own quote. */
+ * `contact_id` lives on quote_requests, not on quotes, so it is joined in here. */
 export async function loadQuote(db, quoteId) {
   const [quotes, items, changes] = await Promise.all([
-    db.query(`SELECT q.*, r.customer_id, r.contact_name, r.contact_email, r.contact_phone, r.request_number
+    db.query(`SELECT q.*, r.contact_id, r.contact_name, r.contact_email, r.contact_phone, r.request_number
               FROM public.quotes q JOIN public.quote_requests r ON r.id = q.quote_request_id
               WHERE q.id=$1`, [quoteId]),
     db.query('SELECT * FROM public.quote_items WHERE quote_id=$1 ORDER BY id', [quoteId]),
@@ -143,7 +141,7 @@ export async function loadQuote(db, quoteId) {
  * Creates a quote, or a superseding revision of one.
  * Staff-only — the caller is responsible for having established that.
  */
-export async function createQuote(db, { quoteRequestId, items, taxRateBp, validUntil, notes, productionAssumptions, paymentTerms, authUserId, supersedes = null }) {
+export async function createQuote(db, { quoteRequestId, items, taxRateBp, validUntil, notes, productionAssumptions, paymentTerms, actorId, supersedes = null }) {
   if (!items?.length) throw new ApiError(422, 'empty_quote', 'A quote needs at least one line item.')
   const totals = totalQuote(items, { taxRateBp })
   const reference = await generateReference(db, 'quote', { table: 'quotes', column: 'quote_number' })
@@ -177,7 +175,7 @@ export async function createQuote(db, { quoteRequestId, items, taxRateBp, validU
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [quoteId, reference, quoteRequestId, QUOTE_STATUS.prepared, totals.subtotal, taxRateBp ?? null, totals.tax, totals.total,
         validUntil || null, notes || null, productionAssumptions || null, paymentTerms || null, version, previous?.id || null,
-        authUserId || null],
+        actorId || null],
     ))
     for (const line of totals.lines) {
       queries.push(tx.query(
@@ -187,7 +185,7 @@ export async function createQuote(db, { quoteRequestId, items, taxRateBp, validU
     }
     queries.push(tx.query(
       'INSERT INTO public.quote_status_history(quote_id, status_code, changed_by_auth_user_id, note) VALUES ($1,$2,$3,$4)',
-      [quoteId, QUOTE_STATUS.prepared, authUserId || null, previous ? `Revision of ${previous.quote_number || previous.id}` : 'Quote prepared'],
+      [quoteId, QUOTE_STATUS.prepared, actorId || null, previous ? `Revision of ${previous.quote_number || previous.id}` : 'Quote prepared'],
     ))
     return queries
   })
@@ -197,7 +195,7 @@ export async function createQuote(db, { quoteRequestId, items, taxRateBp, validU
 }
 
 /** Records acceptance. The accepted figures are frozen by the database trigger. */
-export async function acceptQuote(db, quote, { authUserId = null } = {}) {
+export async function acceptQuote(db, quote, { actorId = null } = {}) {
   assertAcceptable(quote)
   const rows = await db.query(
     `WITH accepted AS (
@@ -211,7 +209,7 @@ export async function acceptQuote(db, quote, { authUserId = null } = {}) {
        SELECT id, $1, $2, 'Accepted by customer' FROM accepted
      )
      SELECT * FROM accepted`,
-    [QUOTE_STATUS.accepted, authUserId, quote.id],
+    [QUOTE_STATUS.accepted, actorId, quote.id],
   )
   // A concurrent acceptance would have set customer_accepted_at first.
   if (!rows[0]) throw new ApiError(409, 'quote_already_accepted', 'This quote has already been accepted.')

@@ -10,19 +10,19 @@
 # origin. `envVarKey` reads the service's own RENDER_EXTERNAL_URL, which is the
 # public https:// URL.
 #
-# No database is declared: Postgres and auth are Supabase's. No migration runs
-# on deploy — a deploy that silently alters a schema is how a production
-# database gets changed by accident. Apply db/migrations from a controlled
-# machine; see SUPABASE.md.
+# No database is declared: Postgres is Neon. No migration runs on deploy — a
+# deploy that silently alters a schema is how a production database gets changed
+# by accident. Apply db/migrations from a controlled machine using
+# MIGRATION_DATABASE_URL (direct, unpooled). See ENVIRONMENT.md.
 #
 # No secret appears in this file. `sync: false` declares a variable without a
 # value so Render prompts at import; the value is entered in the dashboard.
 services:
   # ── Secure API ─────────────────────────────────────────────────────────────
   # `server/render.js` — a thin Node bridge around the Fetch-style handler in
-  # server/index.js. DATABASE_URL and the service_role key live here and
-  # nowhere else; the static site ships every one of its variables to the
-  # browser, so a secret there is a published secret.
+  # server/index.js. DATABASE_URL and ADMIN_USERS_JSON live here and nowhere
+  # else; the static site ships every one of its variables to the browser, so a
+  # secret there is a published secret.
   - type: web
     name: motion-api
     runtime: node
@@ -34,18 +34,20 @@ services:
       - key: NODE_ENV
         value: production
 
-      # SECRET. Supabase session-pooler URI (port 5432), sslmode=require.
-      # Never in the frontend service, never in a VITE_ variable, never in Git.
+      # SECRET. Neon pooled runtime URI. sslmode=require. Never in the frontend
+      # service, never in a VITE_ variable, never in Git.
       - key: DATABASE_URL
         sync: false
 
-      # Public origin, but server-side — the browser has its own VITE_ copy.
-      - key: SUPABASE_URL
+      # SECRET. JSON array of administrators with scrypt password hashes.
+      # Generate hashes with `node scripts/hash-admin-password.js`. Never
+      # paste plaintext passwords into Render.
+      - key: ADMIN_USERS_JSON
         sync: false
 
-      # SECRET. service_role JWT from Supabase Settings → API. API only.
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+      # Administrator session lifetime in hours. Default 8 if unset.
+      - key: ADMIN_SESSION_HOURS
+        value: "8"
 
       # CORS, sourced from the frontend so the allowed origin is exactly the
       # deployed site with no hostname written down. RENDER_EXTERNAL_URL is
@@ -56,29 +58,28 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
 
-      # The two people allowed into the management dashboard, comma separated.
-      # SERVER-ONLY. Never give this a VITE_ name and never add it to the static
-      # site: every variable there ships to the browser, and publishing the
-      # owners' addresses invites targeted phishing at the only accounts that
-      # matter. An address here is not a credential — it grants nothing without a
-      # confirmed Supabase Auth session for that same address.
-      # Empty approves nobody, which is the safe failure.
-      - key: OWNER_ALLOWED_EMAILS
-        sync: false
-
       # Rate-limit identity. `none` is a decision on the record, not an omission.
       #
       # Render APPENDS to X-Forwarded-For rather than replacing it, so its first
       # value is supplied by the caller. Naming it here would be worse than
       # naming nothing: every anonymous caller would pick their own bucket while
-      # the configuration read as though limiting were enforced. Cloudflare's
-      # CF-Connecting-IP is overwritten at its edge, but Render does not document
-      # it and the application cannot verify a request arrived through that edge.
+      # the configuration read as though limiting were enforced.
       #
       # Effect: authenticated callers are limited per session; anonymous callers
       # are not limited by this service. Trade-off in DEPLOYMENT.md.
       - key: API_TRUSTED_CLIENT_HEADER
         value: none
+
+      - key: API_REQUEST_TIMEOUT_MS
+        value: "10000"
+      - key: API_RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: API_RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      - key: API_RATE_LIMIT_MAX_KEYS
+        value: "10000"
+      - key: API_ANONYMOUS_MUTATION_MAX
+        value: "20"
 
   # ── Static frontend ────────────────────────────────────────────────────────
   - type: web
@@ -91,6 +92,17 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      - key: VITE_APP_NAME
+        value: Motion
+
+      # Public site origin. Leave blank until the real domain is known; the
+      # frontend does not require it to boot.
+      - key: VITE_APP_URL
+        fromService:
+          name: motion-frontend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
       # The API's public URL, resolved at Blueprint creation. It arrives as an
       # origin with no path; `src/config/env.js` appends the `/api` prefix the
       # client expects, because render.yaml has no string interpolation and the
@@ -100,14 +112,3 @@ services:
           name: motion-api
           type: web
           envVarKey: RENDER_EXTERNAL_URL
-
-      # Public. The Supabase project origin, no path.
-      - key: VITE_SUPABASE_URL
-        sync: false
-      # Public. The publishable (anon) key. Never the service_role key.
-      - key: VITE_SUPABASE_PUBLISHABLE_KEY
-        sync: false
-      # Public. `true` shows the Google button; only the exact string `false`
-      # hides it. Email and password sign-in is available either way.
-      - key: VITE_SUPABASE_GOOGLE
-        sync: false

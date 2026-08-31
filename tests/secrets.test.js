@@ -3,8 +3,8 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/* Secrets must not ship in the browser. The publishable key is allowed in
- * VITE_ variables; DATABASE_URL and the service_role key are not. */
+/* Secrets must not ship in the browser. DATABASE_URL, administrator hashes,
+ * and migration credentials are server-only. */
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 
@@ -24,8 +24,11 @@ const walk = async (dir, files = []) => {
 }
 
 const FORBIDDEN = [
-  'SUPABASE_SERVICE_ROLE_KEY',
   'DATABASE_URL',
+  'MIGRATION_DATABASE_URL',
+  'ADMIN_USERS_JSON',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'OWNER_ALLOWED_EMAILS',
 ]
 
 describe('no server secrets in the frontend source', () => {
@@ -47,20 +50,25 @@ describe('no server secrets in the frontend source', () => {
     const files = (await walk(dist)).filter((path) => /\.(js|css|html|map)$/.test(path))
     for (const file of files) {
       const source = await readFile(file, 'utf8')
-      expect(source, `${file} must not contain SUPABASE_SERVICE_ROLE_KEY`).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
       expect(source, `${file} must not contain DATABASE_URL`).not.toContain('DATABASE_URL')
+      expect(source, `${file} must not contain MIGRATION_DATABASE_URL`).not.toContain('MIGRATION_DATABASE_URL')
+      expect(source, `${file} must not contain ADMIN_USERS_JSON`).not.toContain('ADMIN_USERS_JSON')
+      expect(source).not.toMatch(/scrypt\$\d+\$/)
       expect(source).not.toMatch(/["']service_role["']\s*:/)
     }
   })
 })
 
-describe('row-level security is defense in depth', () => {
-  it('enables RLS without FORCE so the Node API remains the authority', async () => {
+describe('row-level security is historical, then disabled on Neon', () => {
+  it('keeps 0014 as an immutable applied migration', async () => {
     const sql = await readFile(join(root, 'db/migrations/0014_supabase_rls_and_storage.sql'), 'utf8')
     expect(sql).toMatch(/ENABLE ROW LEVEL SECURITY/)
     expect(sql).not.toMatch(/FORCE ROW LEVEL SECURITY/)
-    expect(sql).toContain('motion-private')
-    expect(sql).toContain('motion-public')
-    expect(sql).toMatch(/REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon/)
+  })
+
+  it('disables that RLS configuration in 0015 because there is no Data API', async () => {
+    const sql = await readFile(join(root, 'db/migrations/0015_neon_guest_admin.sql'), 'utf8')
+    expect(sql).toMatch(/DISABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/no PostgREST|Motion API/i)
   })
 })

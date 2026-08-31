@@ -3,26 +3,30 @@ import { serverConfig } from './config.js'
 
 /* Postgres access for the Render API and local development.
  *
- * Both use node-postgres over TCP. The previous production path was Neon's
- * HTTP driver; that package is gone. The query surface is unchanged:
+ * Runtime traffic uses DATABASE_URL (Neon pooled). Migrations use
+ * MIGRATION_DATABASE_URL (direct, unpooled). The query surface is unchanged:
  * `query(sql, params)` returns rows, and `transaction(build)` runs a batch of
  * statements atomically at SERIALIZABLE isolation.
  *
- * SSL is on for hosted URLs (Supabase requires it) and off for loopback unless
- * the URL itself asks for it. */
+ * TLS is required for hosted Neon URLs. Channel binding is requested when the
+ * URL already carries it; we do not rewrite connection strings. */
 
 export function sslFor(connectionString) {
   const url = String(connectionString || '')
   if (/sslmode=disable/i.test(url)) return false
   try {
     const parsed = new URL(url)
-    const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+    const host = parsed.hostname.toLowerCase()
+    const local = host === 'localhost' || host === '127.0.0.1' || host === '::1'
     if (local && !/sslmode=require/i.test(url)) return false
+    if (host.endsWith('.neon.tech') || /sslmode=require/i.test(url)) {
+      return { rejectUnauthorized: true }
+    }
   } catch {
-    /* Fall through and decide from the rest of the string. */
+    /* Fall through. */
   }
-  if (/sslmode=require/i.test(url) || /supabase\.(co|com)/i.test(url) || /pooler\.supabase/i.test(url)) {
-    return { rejectUnauthorized: false }
+  if (/sslmode=require/i.test(url) || /\.neon\.tech/i.test(url)) {
+    return { rejectUnauthorized: true }
   }
   return false
 }
@@ -32,6 +36,9 @@ export function createPool(connectionString, options = {}) {
     connectionString,
     ssl: sslFor(connectionString),
     max: options.max ?? 10,
+    idleTimeoutMillis: options.idleTimeoutMillis ?? 10_000,
+    connectionTimeoutMillis: options.connectionTimeoutMillis ?? 5_000,
+    allowExitOnIdle: options.allowExitOnIdle ?? true,
   })
 }
 

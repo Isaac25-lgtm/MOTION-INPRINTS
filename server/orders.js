@@ -5,6 +5,7 @@ import { generateReference } from './references.js'
 import { calculatePrice, loadPricingContext } from './pricing.js'
 import { assertAcceptable } from './quotes.js'
 import { createTrackingToken, hashTrackingToken } from './workflow.js'
+import { upsertCustomerContact } from './contacts.js'
 
 /* Order creation (Prompts 8.1, 8.3) and quote conversion (Prompt 6.4).
 
@@ -99,7 +100,7 @@ export async function priceCart(db, items) {
  */
 export async function createOrder(db, {
   items, contact, fulfilment, deliveryAmount = 0, taxAmount = 0, notes = null,
-  customerId = null, authUserId = null, quoteId = null, status = null,
+  contactId = null, upsertContact = false, actorId = null, quoteId = null, status = null,
   idempotency = null,
 }) {
   const priced = quoteId ? null : await priceCart(db, items)
@@ -141,43 +142,53 @@ export async function createOrder(db, {
 
   try {
     await db.transaction((tx) => {
-      const queries = [
-        tx.query(
-          `INSERT INTO public.orders(id, order_number, customer_id, quote_id, contact_name, contact_email, contact_phone, company_name,
+      const contactWrite = upsertContact
+        ? upsertCustomerContact(tx, {
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          company: contact.company,
+        })
+        : null
+      const insertOrder = (resolvedContactId) => tx.query(
+          `INSERT INTO public.orders(id, order_number, contact_id, quote_id, contact_name, contact_email, contact_phone, company_name,
                                      status_code, subtotal, total_amount, tax_amount, delivery_amount, currency,
                                      fulfilment_method, delivery_address, delivery_notes, notes, placed_by_auth_user_id, tracking_token)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
-          [orderId, reference, customerId, quoteId, contact.name, contact.email, contact.phone || null, contact.company || null,
+          [orderId, reference, resolvedContactId, quoteId, contact.name, contact.email, contact.phone || null, contact.company || null,
             openingStatus, subtotal, total, tax, delivery, CURRENCY,
-            fulfilment.method, fulfilment.address || null, fulfilment.notes || null, notes, authUserId,
+            fulfilment.method, fulfilment.address || null, fulfilment.notes || null, notes, actorId,
             hashTrackingToken(trackingToken)],
-        ),
-        tx.query(
+        )
+      const orderWrite = contactWrite ? contactWrite.then(insertOrder) : Promise.resolve(insertOrder(contactId))
+      const queries = contactWrite ? [contactWrite, orderWrite] : [orderWrite]
+      queries.push(
+        orderWrite.then(() => tx.query(
           'INSERT INTO public.order_status_history(order_id, status_code, changed_by_auth_user_id, note) VALUES ($1,$2,$3,$4)',
-          [orderId, openingStatus, authUserId, quoteId ? 'Created from accepted quote' : 'Order placed'],
-        ),
-      ]
+          [orderId, openingStatus, actorId, quoteId ? 'Created from accepted quote' : 'Order placed'],
+        )),
+      )
 
       // Items belong to the same transaction as the order they complete.
       for (const line of persistedLines) {
-        queries.push(tx.query(
+        queries.push(orderWrite.then(() => tx.query(
           `INSERT INTO public.order_items(id, order_id, product_id, title, quantity, unit_price, line_total, configuration,
-                                          design_service_required, artwork_status, price_snapshot)
+                                           design_service_required, artwork_status, price_snapshot)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [line.id, orderId, line.productId || null, line.title, line.quantity, line.unitPrice, line.lineTotal,
             JSON.stringify(line.configuration || {}), Boolean(line.designService),
             line.artworkStatus || (line.artworkRequirement === 'required' && !line.designService ? 'awaiting_upload' : 'not_required'),
             JSON.stringify(line.priceSnapshot || {})],
-        ))
+        )))
       }
 
       // Reserving the key here means a concurrent duplicate hits the primary key
       // and rolls back, rather than racing an already-created order.
       if (idempotency?.key) {
-        queries.push(tx.query(
+        queries.push(orderWrite.then(() => tx.query(
           'INSERT INTO public.idempotency_keys(key, scope, request_fingerprint, response) VALUES ($1,$2,$3,$4)',
           [idempotency.key, idempotency.scope, fingerprint(idempotency.request), JSON.stringify(result)],
-        ))
+        )))
       }
 
       return queries
@@ -198,7 +209,7 @@ export async function createOrder(db, {
  * `orders.quote_id` is UNIQUE, so a second conversion is impossible at the
  * database level even if two requests arrive simultaneously.
  */
-export async function convertQuoteToOrder(db, { quote, items, customerId = null, authUserId = null, fulfilment = { method: 'collection' }, contact }) {
+export async function convertQuoteToOrder(db, { quote, items, contactId = null, actorId = null, fulfilment = { method: 'collection' }, contact }) {
   if (!quote.customer_accepted_at) {
     // Not accepted yet: say why precisely rather than a generic refusal.
     assertAcceptable(quote)
@@ -249,8 +260,8 @@ export async function convertQuoteToOrder(db, { quote, items, customerId = null,
     fulfilment,
     // The accepted figures carry over exactly; nothing is recalculated.
     taxAmount: tax,
-    customerId,
-    authUserId,
+    contactId,
+    actorId,
     quoteId: quote.id,
     status: ORDER_STATUS.awaiting_payment,
     notes: `Converted from quote ${quote.quote_number} (version ${quote.version}).`,

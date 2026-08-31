@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import pg from 'pg'
 import { createApi } from '../server/api.js'
 import { PAYMENT_STATUS, verifyAndSettle } from '../server/payments.js'
 import { hashToken } from '../server/quotes.js'
+import { hashPassword } from '../server/admins.js'
+import { createAdminSession, hashUsername } from '../server/sessions.js'
 
 /* Integration tests against a real PostgreSQL.
  *
@@ -114,8 +114,57 @@ describeIfDb('schema behaviour (real database)', () => {
       '0004_quotes_and_orders.sql', '0005_portfolio_and_cms.sql', '0006_quote_status_vocabulary.sql',
       '0007_accepted_quote_immutability.sql', '0008_quote_access_and_lifecycle.sql',
       '0009_catalogue_relationships_and_uploads.sql', '0010_proofs_tracking_and_audit.sql', '0011_proof_evidence_integrity.sql', '0012_proof_supersession_invariant.sql',
-      '0013_owner_role_and_digital_first.sql',
+      '0013_owner_role_and_digital_first.sql', '0014_supabase_rls_and_storage.sql',
+      '0015_neon_guest_admin.sql', '0016_neon_runtime_role.sql',
     ])
+  })
+
+  it('creates a restricted runtime role with application DML privileges', async () => {
+    const { rows: [role] } = await client.query(
+      `SELECT rolcanlogin, rolinherit,
+              has_schema_privilege('motion_app', 'public', 'USAGE') AS can_use_public,
+              has_schema_privilege('motion_app', 'public', 'CREATE') AS can_create_public,
+              has_table_privilege('motion_app', 'public.orders', 'SELECT,INSERT,UPDATE,DELETE') AS can_write_orders
+       FROM pg_roles WHERE rolname='motion_app'`,
+    )
+    expect(role).toMatchObject({
+      rolcanlogin: true,
+      rolinherit: false,
+      can_use_public: true,
+      can_create_public: false,
+      can_write_orders: true,
+    })
+  })
+
+  it('atomically records login failures and resets an expired lock window', async () => {
+    await inRollback(async () => {
+      const db = realDatabase()
+      const admins = [{
+        id: '11111111-1111-4111-8111-111111111111',
+        username: 'ada',
+        passwordHash: await hashPassword('correct-horse'),
+      }]
+      const started = new Date('2030-01-01T00:00:00.000Z')
+      for (let index = 0; index < 5; index += 1) {
+        await createAdminSession(db, { username: 'ada', password: 'wrong', admins, now: started }).catch(() => {})
+      }
+      const [locked] = await db.query(
+        'SELECT failed_count, locked_until FROM public.admin_login_attempts WHERE username_hash=$1',
+        [hashUsername('ada')],
+      )
+      expect(locked.failed_count).toBe(5)
+      expect(locked.locked_until).toBeTruthy()
+
+      await createAdminSession(db, {
+        username: 'ada', password: 'wrong', admins, now: new Date('2030-01-01T00:16:00.000Z'),
+      }).catch(() => {})
+      const [reset] = await db.query(
+        'SELECT failed_count, locked_until FROM public.admin_login_attempts WHERE username_hash=$1',
+        [hashUsername('ada')],
+      )
+      expect(reset.failed_count).toBe(1)
+      expect(reset.locked_until).toBeNull()
+    })
   })
 
   /* ── Category 9/10 guarantees, verified against real PostgreSQL ─────────── */
@@ -619,7 +668,7 @@ describeIfDb('schema behaviour (real database)', () => {
       const database = { query: async (statement, parameters = []) => (await client.query(statement, parameters)).rows }
       const api = createApi({
         db: database,
-        authenticate: async () => ({ authUserId: '11111111-1111-4111-8111-111111111111', profile: { id: 'admin-profile', role: 'owner' } }),
+        authenticate: async () => ({ actorId: '11111111-1111-4111-8111-111111111111', username: 'ada', role: 'owner' }),
         logger: { info() {}, error() {} },
       })
       const response = await api(new Request('https://motion.test/api/admin/content/announcement', {
@@ -724,140 +773,77 @@ describeIfDb('schema behaviour (real database)', () => {
       expect(Number((await client.query('SELECT count(*) AS n FROM public.orders WHERE order_number=$1', [created.data.reference])).rows[0].n)).toBe(1)
       expect(Number((await client.query('SELECT count(*) AS n FROM public.order_items WHERE order_id=$1', [created.data.id])).rows[0].n)).toBe(1)
       expect(Number((await client.query('SELECT count(*) AS n FROM public.order_status_history WHERE order_id=$1', [created.data.id])).rows[0].n)).toBe(1)
+      const { rows: [orderRow] } = await client.query('SELECT contact_id, contact_email, contact_name FROM public.orders WHERE id=$1', [created.data.id])
+      expect(orderRow.contact_id).toBeTruthy()
+      expect(orderRow.contact_email).toBe('api@example.test')
+      expect(orderRow.contact_name).toBe('API Customer')
+      const { rows: [contact] } = await client.query('SELECT original_email, normalized_email FROM public.customer_contacts WHERE id=$1', [orderRow.contact_id])
+      expect(contact.normalized_email).toBe('api@example.test')
+      expect(contact.original_email).toBe('api@example.test')
     })
   })
 
-  it('serves owned quote lists/details and completes private artwork through the API', async () => {
+  it('upserts a guest contact on inquiry and never writes user_profiles', async () => {
     await inRollback(async () => {
-      const authUserId = crypto.randomUUID()
-      const { rows: [profile] } = await client.query(
-        "INSERT INTO public.user_profiles(auth_user_id,role,full_name) VALUES($1,'customer','API Owner') RETURNING id", [authUserId])
-      const requestId = await newRequest()
-      await client.query('UPDATE public.quote_requests SET customer_id=$1 WHERE id=$2', [profile.id, requestId])
-      const quote = await newQuote(requestId)
-      await client.query("INSERT INTO public.quote_items(quote_id,title,quantity,unit_price,line_total) VALUES($1,'Quoted work',1,500000,500000)", [quote.id])
+      const api = createApi({ db: realDatabase(), logger: { info() {}, error() {} } })
+      const submitted = await apiJson(await api(new Request('https://motion.test/api/quote-requests', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contactName: 'API Inquirer',
+          contactEmail: 'Inquirer@Example.TEST',
+          contactPhone: '0700000001',
+          projectBrief: 'Need a shopfront sign for a new branch opening.',
+        }),
+      })))
+      expect(submitted.status).toBe(201)
+      const { rows: [request] } = await client.query('SELECT contact_id, contact_email, contact_name FROM public.quote_requests WHERE request_number=$1', [submitted.data.request_number])
+      expect(request.contact_id).toBeTruthy()
+      expect(request.contact_email).toBe('Inquirer@Example.TEST')
+      expect(request.contact_name).toBe('API Inquirer')
+      const { rows: [contact] } = await client.query('SELECT normalized_email, phone FROM public.customer_contacts WHERE id=$1', [request.contact_id])
+      expect(contact.normalized_email).toBe('inquirer@example.test')
+      const { rows: profiles } = await client.query("SELECT 1 FROM public.user_profiles WHERE full_name = 'API Inquirer'")
+      expect(profiles).toHaveLength(0)
+    })
+  })
 
-      const authenticate = async () => ({ authUserId, profile: { id: profile.id, role: 'customer', full_name: 'API Owner' } })
+  it('refuses guest artwork uploads and allows an administrator when storage is configured', async () => {
+    await inRollback(async () => {
+      const { rows: [order] } = await client.query(
+        `INSERT INTO public.orders(order_number,contact_name,contact_email,status_code,subtotal,total_amount)
+         VALUES($1,'API Owner','owner@example.test','artwork_required',1000,1000) RETURNING id`,
+        [`MOT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`])
+      const { rows: [item] } = await client.query(
+        "INSERT INTO public.order_items(order_id,title,quantity,unit_price,line_total,artwork_status) VALUES($1,'Print',1,1000,1000,'awaiting_upload') RETURNING id", [order.id])
       const storageEvents = []
       const storage = {
+        configured: true,
         createUploadUrl: async ({ objectKey }) => { storageEvents.push(['intent', objectKey]); return { url: 'https://storage.test/signed', method: 'PUT' } },
         verifyObject: async ({ objectKey }) => storageEvents.push(['verify', objectKey]),
         deleteObject: async ({ objectKey }) => storageEvents.push(['delete', objectKey]),
       }
-      const api = createApi({ db: realDatabase(), authenticate, storage, logger: { info() {}, error() {} } })
+      const guest = createApi({ db: realDatabase(), storage, logger: { info() {}, error() {} } })
+      const denied = await apiJson(await guest(new Request('https://motion.test/api/files/upload-intent', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename: 'artwork.pdf', mimeType: 'application/pdf', byteSize: 2048, purpose: 'customer_artwork', orderItemId: item.id }),
+      })))
+      expect(denied.status).toBe(401)
 
-      const list = await apiJson(await api(new Request('https://motion.test/api/quotes')))
-      expect(list.status).toBe(200)
-      expect(list.data[0]).toMatchObject({ request_id: requestId, quote_id: quote.id })
-      const detail = await apiJson(await api(new Request(`https://motion.test/api/quotes/${quote.id}`)))
-      expect(detail.status).toBe(200)
-      expect(detail.data.items[0].title).toBe('Quoted work')
-
-      const { rows: [order] } = await client.query(
-        `INSERT INTO public.orders(order_number,customer_id,contact_name,contact_email,status_code,subtotal,total_amount)
-         VALUES($1,$2,'API Owner','owner@example.test','artwork_required',1000,1000) RETURNING id`,
-        [`MOT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, profile.id])
-      const { rows: [item] } = await client.query(
-        "INSERT INTO public.order_items(order_id,title,quantity,unit_price,line_total,artwork_status) VALUES($1,'Print',1,1000,1000,'awaiting_upload') RETURNING id", [order.id])
-
+      const api = createApi({
+        db: realDatabase(),
+        authenticate: async () => ({ actorId: '11111111-1111-4111-8111-111111111111', username: 'ada', role: 'owner' }),
+        storage,
+        logger: { info() {}, error() {} },
+      })
       const intent = await apiJson(await api(new Request('https://motion.test/api/files/upload-intent', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ filename: 'artwork.pdf', mimeType: 'application/pdf', byteSize: 2048, purpose: 'customer_artwork', orderItemId: item.id }),
       })))
       expect(intent.status).toBe(201)
       expect(intent.data.asset.upload_status).toBe('pending')
-      const { rows: [pending] } = await client.query('SELECT visibility,upload_status FROM public.media_assets WHERE id=$1', [intent.data.asset.id])
-      expect(pending).toMatchObject({ visibility: 'private', upload_status: 'pending' })
-
       const completed = await apiJson(await api(new Request(`https://motion.test/api/files/${intent.data.asset.id}/complete`, { method: 'POST' })))
       expect(completed.data.upload_status).toBe('available')
-      expect((await client.query('SELECT artwork_status FROM public.order_items WHERE id=$1', [item.id])).rows[0].artwork_status).toBe('received')
-      expect((await client.query('SELECT status_code FROM public.orders WHERE id=$1', [order.id])).rows[0].status_code).toBe('artwork_received')
-      const removed = await apiJson(await api(new Request(`https://motion.test/api/files/${intent.data.asset.id}`, { method: 'DELETE' })))
-      expect(removed.data.removed).toBe(true)
-      expect(storageEvents.map(event => event[0])).toEqual(['intent', 'verify', 'delete'])
-      expect((await client.query('SELECT id FROM public.media_assets WHERE id=$1', [intent.data.asset.id])).rows).toHaveLength(0)
-      expect((await client.query('SELECT artwork_status FROM public.order_items WHERE id=$1', [item.id])).rows[0].artwork_status).toBe('awaiting_upload')
-      expect((await client.query('SELECT status_code FROM public.orders WHERE id=$1', [order.id])).rows[0].status_code).toBe('artwork_required')
+      expect(storageEvents.map((event) => event[0])).toEqual(['intent', 'verify'])
     })
-  })
-})
-
-/* Owner bootstrap.
- *
- * The promotion script is the only path to `admin` — there is no HTTP route, no
- * UI control and no environment variable. It runs as a real subprocess here,
- * because what matters is its refusal behaviour at the boundary, not a function
- * call: it must never invent a profile for an id that has not signed in, and it
- * must never accept anything looser than an exact auth_user_id.
- */
-describeIfDb('owner promotion script', () => {
-  const run = promisify(execFile)
-
-  /** Runs the script and returns { code, out } without throwing on failure. */
-  const promote = async (args) => {
-    try {
-      const { stdout } = await run(process.execPath, ['--env-file=.env', 'scripts/promote-admin.js', ...args], { cwd: process.cwd() })
-      return { code: 0, out: stdout }
-    } catch (error) {
-      return { code: error.code ?? 1, out: `${error.stdout || ''}${error.stderr || ''}` }
-    }
-  }
-
-  let client
-  const TEST_ID = '3f1b7c92-5d4e-4a81-9c02-7e6f5a4b3c21'
-
-  beforeAll(async () => {
-    client = new pg.Client({ connectionString: url })
-    await client.connect()
-    await client.query('DELETE FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-  })
-  afterAll(async () => {
-    await client.query('DELETE FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-    await client.end()
-  })
-
-  it('refuses an id that has no profile, and creates nothing', async () => {
-    const result = await promote([TEST_ID])
-    expect(result.code, 'must exit non-zero').not.toBe(0)
-    expect(result.out).toMatch(/No profile exists/i)
-    expect(result.out).toMatch(/never creates one/i)
-
-    const { rows } = await client.query('SELECT 1 FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-    expect(rows, 'the script must not insert a profile row').toHaveLength(0)
-  })
-
-  it('refuses anything that is not an exact auth_user_id', async () => {
-    for (const bad of ['owner@example.com', 'Amina Nakato', 'first', '123']) {
-      const result = await promote([bad])
-      expect(result.code, `"${bad}" must be rejected`).not.toBe(0)
-      expect(result.out).toMatch(/not a valid auth_user_id/i)
-    }
-  })
-
-  it('promotes exactly the profile it was given, and is idempotent', async () => {
-    await client.query(
-      "INSERT INTO public.user_profiles(auth_user_id, role, full_name) VALUES($1, 'customer', 'Bootstrap Test')",
-      [TEST_ID],
-    )
-
-    const first = await promote([TEST_ID])
-    expect(first.code).toBe(0)
-    expect(first.out).toMatch(/Promoted exactly one profile/i)
-    expect(first.out).toContain(TEST_ID)
-
-    const { rows } = await client.query('SELECT role FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-    expect(rows[0].role).toBe('owner')
-
-    // Running it again changes nothing rather than erroring.
-    const again = await promote([TEST_ID])
-    expect(again.code).toBe(0)
-    expect(again.out).toMatch(/No change/i)
-
-    // And it reverses cleanly, so a mistaken promotion is recoverable.
-    const demoted = await promote([TEST_ID, '--demote'])
-    expect(demoted.code).toBe(0)
-    const after = await client.query('SELECT role FROM public.user_profiles WHERE auth_user_id = $1', [TEST_ID])
-    expect(after.rows[0].role).toBe('customer')
   })
 })

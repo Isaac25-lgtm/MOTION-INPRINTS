@@ -8,8 +8,6 @@ import { EmptyState, LoadingState } from '../components/ui/States'
 import { useToast } from '../components/ToastProvider'
 import { useCart } from '../features/cart/CartProvider'
 import { orderService } from '../services/orderService'
-import { useAuth } from '../auth/AuthProvider'
-import { ArtworkUploader } from '../features/artwork/ArtworkUploader'
 
 /* Checkout (Prompt 8.1).
 
@@ -199,7 +197,6 @@ export function CheckoutPage() {
 /* Confirmation (Prompt 8.3). States what is known and nothing more — no invented
    delivery date, and no claim that a message was sent. */
 export function OrderConfirmedPage() {
-  const { user } = useAuth()
   const { state } = window.history
   const order = state?.usr?.order || null
   const reference = window.location.pathname.split('/').pop()
@@ -232,8 +229,7 @@ export function OrderConfirmedPage() {
               <p className="t-eyebrow t-eyebrow--accent">Save this now</p>
               <h2 className="t-h3" id="tracking">Your tracking code</h2>
               <p className="t-body-sm">
-                This code is shown once and cannot be sent again. Keep it to check progress
-                without signing in.
+                This code is shown once and cannot be sent again. Keep it to check progress.
               </p>
               <p className="tracking-code"><code>{order.trackingToken}</code></p>
               <div className="cluster">
@@ -258,15 +254,16 @@ export function OrderConfirmedPage() {
             )}
           </div>
 
-          {order?.items?.filter(item => item.artworkStatus === 'awaiting_upload').map(item => (
+          {order?.items?.filter((item) => item.artworkStatus === 'awaiting_upload').map((item) => (
             <section className="stack rule" style={{ paddingBlockStart: 'var(--space-5)' }} key={item.id}>
               <div>
                 <p className="t-eyebrow">Artwork for</p>
                 <h2 className="t-h3">{item.title}</h2>
               </div>
-              {user
-                ? <ArtworkUploader orderItemId={item.id} />
-                : <p className="t-body-sm t-muted">You chose to provide artwork later. Sign in after account access is enabled, or contact Motion with order reference <strong>{order.reference}</strong>, to send the files privately.</p>}
+              <p className="t-body-sm t-muted">
+                Send the files directly to Motion with order reference <strong>{order.reference}</strong>.
+                Online upload is not available yet.
+              </p>
             </section>
           ))}
 

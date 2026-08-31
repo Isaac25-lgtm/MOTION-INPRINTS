@@ -68,7 +68,7 @@ export function AboutPage() {
                   </p>
                   <p>
                     You approve a proof before a job goes into production, and you can follow
-                    its progress from your account until it is delivered.
+                    its progress with the tracking code from your confirmation.
                   </p>
                 </>
               )}

@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { App } from './App'
-import { AuthProvider } from './auth/AuthProvider'
+import { AdminSessionProvider } from './auth/AdminSessionProvider'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './components/ToastProvider'
 import { SiteContentProvider } from './content/SiteContentProvider'
@@ -16,13 +16,13 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
-        <AuthProvider>
+        <AdminSessionProvider>
           <SiteContentProvider>
             <CartProvider>
               <BrowserRouter><App /></BrowserRouter>
             </CartProvider>
           </SiteContentProvider>
-        </AuthProvider>
+        </AdminSessionProvider>
       </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,

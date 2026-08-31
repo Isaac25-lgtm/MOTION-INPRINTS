@@ -109,7 +109,7 @@ export function trackingTokenMatches(supplied, storedHash) {
 /* ── Proofs (Prompt 9.3) ───────────────────────────────────────────────────── */
 
 /** Uploads a proof, superseding any version still awaiting a response. */
-export async function createProof(db, { orderId, orderItemId = null, mediaId = null, notes = null, authUserId }) {
+export async function createProof(db, { orderId, orderItemId = null, mediaId = null, notes = null, actorId }) {
   const [order] = await db.query('SELECT id, order_number, status_code FROM public.orders WHERE id=$1', [orderId])
   if (!order) throw new ApiError(404, 'not_found', 'Order not found.')
 
@@ -128,14 +128,14 @@ export async function createProof(db, { orderId, orderItemId = null, mediaId = n
     queries.push(tx.query(
       `INSERT INTO public.design_proofs(id, order_id, order_item_id, version, media_id, motion_notes, uploaded_by_auth_user_id, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'awaiting_response')`,
-      [proofId, orderId, orderItemId, version, mediaId, notes, authUserId]))
+      [proofId, orderId, orderItemId, version, mediaId, notes, actorId]))
     // Sending a proof puts the ball in the customer's court.
     queries.push(tx.query(
       "UPDATE public.orders SET status_code='awaiting_customer_approval', requires_proof_approval=true, updated_at=now() WHERE id=$1 AND status_code <> 'cancelled'",
       [orderId]))
     queries.push(tx.query(
       "INSERT INTO public.order_status_history(order_id, status_code, changed_by_auth_user_id, note) VALUES ($1,'awaiting_customer_approval',$2,$3)",
-      [orderId, authUserId, `Proof v${version} sent for approval`]))
+      [orderId, actorId, `Proof v${version} sent for approval`]))
     return queries
   })
 
@@ -144,7 +144,7 @@ export async function createProof(db, { orderId, orderItemId = null, mediaId = n
 }
 
 /** Records a customer decision against one exact proof version. */
-export async function respondToProof(db, { proof, action, comment = null, authUserId = null }) {
+export async function respondToProof(db, { proof, action, comment = null, actorId = null }) {
   if (proof.superseded_at || proof.status === 'superseded') {
     throw new ApiError(409, 'proof_superseded', 'A newer version of this proof has been sent. Please review the latest one.')
   }
@@ -162,7 +162,7 @@ export async function respondToProof(db, { proof, action, comment = null, authUs
        SET status=$1, customer_response_at=now(), customer_response_by_auth_user_id=$2, customer_comment=$3
        WHERE id=$4 AND customer_response_at IS NULL AND superseded_at IS NULL
        RETURNING id`,
-      [status, authUserId, comment, proof.id]),
+      [status, actorId, comment, proof.id]),
     tx.query(
       // approved_proof_id is what the production guard checks, so it is set in
       // the same statement batch as the approval itself.
@@ -171,7 +171,7 @@ export async function respondToProof(db, { proof, action, comment = null, authUs
       [orderStatus, approving ? proof.id : null, proof.order_id]),
     tx.query(
       'INSERT INTO public.order_status_history(order_id, status_code, changed_by_auth_user_id, note) VALUES ($1,$2,$3,$4)',
-      [proof.order_id, orderStatus, authUserId, approving ? `Proof v${proof.version} approved by customer` : `Changes requested on proof v${proof.version}`]),
+      [proof.order_id, orderStatus, actorId, approving ? `Proof v${proof.version} approved by customer` : `Changes requested on proof v${proof.version}`]),
   ])
 
   // The conditional UPDATE matched nothing: another request answered first.
@@ -197,9 +197,9 @@ export const presentProof = (proof, mediaBaseUrl = null) => ({
 })
 
 /** Records an administrative action. Never store secrets in `detail`. */
-export async function recordAudit(db, { actorAuthUserId, action, entityType, entityId = null, summary = null, detail = {} }) {
+export async function recordAudit(db, { actorId, action, entityType, entityId = null, summary = null, detail = {} }) {
   await db.query(
     'INSERT INTO public.admin_audit_log(actor_auth_user_id, action, entity_type, entity_id, summary, detail) VALUES ($1,$2,$3,$4,$5,$6)',
-    [actorAuthUserId || null, action, entityType, entityId, summary, JSON.stringify(detail)],
+    [actorId || null, action, entityType, entityId, summary, JSON.stringify(detail)],
   )
 }

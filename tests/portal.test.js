@@ -97,9 +97,7 @@ describe('guest tracking security', () => {
     expect(wrong.error.message).toBe('Order not found.')
   })
 
-  it('returns tracking-safe information only, never the customer record', async () => {
-    /* A tracking link gets forwarded, printed on a job bag and read over
-       shoulders. Whoever holds it must learn where the job is and nothing else. */
+  it('returns permitted guest order details without secrets or administrator fields', async () => {
     const token = createTrackingToken()
     const order = {
       id: 'o1', order_number: 'MOT-BBB333', status_code: 'in_production',
@@ -108,6 +106,7 @@ describe('guest tracking security', () => {
       delivery_address: 'Plot 42, Kololo, Kampala',
       contact_name: 'Ada Lovelace', contact_email: 'ada@example.test', contact_phone: '+256700000000',
       company_name: 'Analytical Engines Ltd', notes: 'Call before delivering',
+      internal_notes: 'Staff only',
       created_at: '2026-01-01T00:00:00Z', tracking_token: hashTrackingToken(token),
     }
     const db = {
@@ -122,17 +121,17 @@ describe('guest tracking security', () => {
     expect(result.status).toBe(200)
 
     const body = JSON.stringify(result.data)
-    for (const leaked of ['Plot 42', 'Kololo', 'Ada Lovelace', 'ada@example.test', '+256700000000', 'Analytical Engines', 'Call before delivering', '500000']) {
-      expect(body, `tracking response leaked "${leaked}"`).not.toContain(leaked)
-    }
-    // What it must still carry: enough to know where the job has got to.
     expect(result.data.reference).toBe('MOT-BBB333')
     expect(result.data.statusLabel).toBe('In production')
+    expect(result.data.total).toBe('500000')
+    expect(result.data.contactName).toBe('Ada Lovelace')
     expect(result.data.timeline.length).toBeGreaterThan(0)
-    expect(result.data.items[0]).toEqual({ title: 'Pull-up banner', quantity: 2 })
-    // Item configuration and artwork state are not tracking information.
-    expect(result.data.items[0].configuration).toBeUndefined()
-    expect(result.data.total).toBeUndefined()
+    expect(result.data.items[0].title).toBe('Pull-up banner')
+    expect(body).not.toContain(order.tracking_token)
+    expect(body).not.toContain('Staff only')
+    expect(body).not.toContain('internal_notes')
+    expect(body).not.toContain('actorId')
+    expect(body).not.toContain('password')
   })
 
   it('issues unguessable tokens', () => {
@@ -232,7 +231,7 @@ describe('reorder', () => {
 })
 
 describe('admin authorization', () => {
-  const asCustomer = async () => ({ authUserId: 'u1', profile: { id: 'c1', role: 'customer' } })
+  const asCustomer = async () => ({ actorId: 'u1', username: 'mallory', role: 'customer' })
 
   it('refuses every admin route to an authenticated customer', async () => {
     const api = createApi({ db: { query: async () => [] }, authenticate: asCustomer, logger: silent })
@@ -257,6 +256,7 @@ describe('reports', () => {
     }
     // The denominator is explicit, not "eligible quotes" left to interpretation.
     expect(METRIC_DEFINITIONS.quoteConversion).toMatch(/quotes sent/i)
+    expect(METRIC_DEFINITIONS.repeatCustomers).toMatch(/contact_id/)
     expect(METRIC_DEFINITIONS.revenue).toMatch(/successful/i)
   })
 

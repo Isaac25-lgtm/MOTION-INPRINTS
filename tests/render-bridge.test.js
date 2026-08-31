@@ -6,8 +6,8 @@ import { createRenderServer } from '../server/render.js'
 /* The Node bridge that lets the Fetch-style handler run as a Render Web Service.
  *
  * `createRenderServer` takes the handler as an argument so these tests can pass
- * a stub. Importing the real one would construct a database client and a
- * Supabase Auth client from environment variables, which is a deployment
+ * a stub. Importing the real one would construct a database client from
+ * environment variables, which is a deployment
  * concern rather than anything this file is responsible for — the bridge's
  * whole job is translating between Node and Fetch, and that is what is
  * measured here.
