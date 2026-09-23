@@ -11,8 +11,11 @@ import { getWorkItem } from "./work";
  * Options are the specifications a quotation needs, not a promise that every
  * combination is available; the team confirms on reply.
  *
- * Pictures are genuine pieces from the Motion archive (permission pending,
- * listed by launch:check), shown as examples of the product type.
+ * Pictures are genuine, owner-approved pieces from the Motion archive, shown
+ * as examples of the product type. Where no good genuine photograph exists
+ * (mugs, wayfinding plates) a licensed stock photograph of a plain, unbranded
+ * item stands in; product-media.json records its source and licence. Stock
+ * never appears in Work.
  */
 
 export type ProductCategory =
@@ -516,7 +519,7 @@ export const products: Product[] = [
     service: "signage",
     image: productImage(
       "wayfinding-plates",
-      "Blue marker plates with white lettering, held up in the workshop.",
+      "A dark marble directional sign on a wall, pointing to the lifts.",
     ),
   }),
 
@@ -683,7 +686,7 @@ export const products: Product[] = [
     service: "corporate",
     image: productImage(
       "mugs",
-      "Black mugs and flasks with red script branding on a desk.",
+      "A plain white mug on an office desk beside a plant and an open notebook.",
     ),
   }),
   product({
@@ -861,10 +864,7 @@ export const products: Product[] = [
     ],
     unit: "bags",
     service: "packaging",
-    image: productImage(
-      "paper-bags",
-      "A white paper bag with black rope handles printed with the Trendy Hanger logo.",
-    ),
+    image: workImage("branded-carrier-bags"),
   }),
 ];
 

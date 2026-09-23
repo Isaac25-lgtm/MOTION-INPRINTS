@@ -130,8 +130,11 @@ test("asset manifest covers 173 originals and excludes reject-public from the si
     assert.ok(row.orientation_review);
     assert.notEqual(row.orientation_review, "none-assumed");
     assert.notEqual(row.rotation, "none-assumed");
-    assert.notEqual(row.permission, "approved");
-    assert.notEqual(row.publication, "launch-approved");
+    // Only photographs the site serves carry the owner's approval.
+    if (row.permission === "approved") {
+      assert.ok(row.public_derivatives.length > 0, row.original_filename);
+      assert.equal(row.publication, "launch-approved");
+    }
     assert.ok(row.presentation);
     assert.ok(row.publication);
     assert.ok(row.derivative_transform);

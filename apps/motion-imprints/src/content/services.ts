@@ -90,7 +90,7 @@ export const serviceDetails: Record<ServiceSlug, ServiceDetail> = {
     work: [
       "printed-labels",
       "framed-art-print",
-      "launch-display-board",
+      "cut-out-logo-sign",
       "guest-book",
       "round-card",
     ],

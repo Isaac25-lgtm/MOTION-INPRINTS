@@ -53,7 +53,7 @@ test("every product is priced on quotation; no price, stock or urgency is invent
   assert.match(pages[2], /Priced on quotation/);
 });
 
-test("every product image is a built genuine derivative", () => {
+test("every product image is an approved genuine photo or recorded licensed stock", () => {
   for (const m of catalogue.matchAll(/productImage\(\s*"([a-z0-9-]+)"/g)) {
     const media = productMedia[m[1]];
     assert.ok(media, `product media ${m[1]}`);
@@ -65,8 +65,18 @@ test("every product image is a built genuine derivative", () => {
           ),
           `${m[1]}-${w}.${ext}`,
         );
+    if (media.source.startsWith("Pexels ")) {
+      // Stand-in for a product with no good genuine photograph.
+      assert.equal(media.licence, "Pexels License", m[1]);
+      assert.match(
+        media.sourceUrl,
+        /^https:\/\/www\.pexels\.com\/photo\/\d+\/$/,
+      );
+      continue;
+    }
     const row = manifest.find((r) => r.original_filename === media.source);
     assert.equal(row.presentation, "real-work");
+    assert.equal(row.permission, "approved", m[1]);
     assert.notEqual(row.tier, "hold");
     assert.notEqual(row.tier, "reject-public");
   }

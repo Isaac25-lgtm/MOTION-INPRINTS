@@ -9,7 +9,7 @@ import type { Frame } from "@/components/media/Picture";
  * kind:
  *   stock    licensed atmosphere, never presented as Motion work
  *   mockup   licensed stock with the supplied Motion logo composited on it
- *   genuine  real Motion photograph, enhanced derivative, permission pending
+ *   genuine  real Motion photograph, enhanced derivative, owner-approved
  */
 
 const R = "/media/home";
@@ -103,7 +103,7 @@ export const services: Service[] = [
   },
 ];
 
-// kind: genuine, permission pending (IMG-20260921-WA0278.jpg)
+// kind: genuine, owner-approved (IMG-20260921-WA0278.jpg)
 export const featured: Frame = {
   base: `${R}/featured/ceo-letters`,
   widths: [1600, 1000, 640],
@@ -115,7 +115,7 @@ export const featured: Frame = {
 
 export type WorkItem = { label: string; frame: Frame; source: string };
 
-// kind: genuine, permission pending. Never place stock or mockups here.
+// kind: genuine, owner-approved. Never place stock or mockups here.
 export const workLead: WorkItem[] = [
   {
     label: "Illuminated letters",

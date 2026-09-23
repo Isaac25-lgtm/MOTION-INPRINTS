@@ -30,7 +30,7 @@ const frame = (slug: string, alt: string): Frame => ({
   alt,
 });
 
-// Genuine archive photographs, permission pending (listed by launch:check).
+// Genuine archive photographs, approved by the owner for publication.
 const inProduction = [
   {
     frame: frame(

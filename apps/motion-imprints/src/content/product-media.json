@@ -23,12 +23,6 @@
     "width": 1400,
     "height": 1051
   },
-  "mugs": {
-    "source": "IMG-20260921-WA0060.jpg",
-    "widths": [1400, 900, 560],
-    "width": 1400,
-    "height": 1054
-  },
   "wristbands": {
     "source": "IMG-20260921-WA0059.jpg",
     "widths": [1400, 900, 560],
@@ -53,12 +47,6 @@
     "width": 1400,
     "height": 1493
   },
-  "paper-bags": {
-    "source": "IMG-20260921-WA0076.jpg",
-    "widths": [1400, 900, 560],
-    "width": 1400,
-    "height": 2489
-  },
   "flyers": {
     "source": "IMG-20260921-WA0250.jpg",
     "widths": [1400, 900, 560],
@@ -77,10 +65,22 @@
     "width": 1400,
     "height": 787
   },
+  "mugs": {
+    "source": "Pexels 4065905",
+    "licence": "Pexels License",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "sourceUrl": "https://www.pexels.com/photo/4065905/",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1750
+  },
   "wayfinding-plates": {
-    "source": "IMG-20260920-WA0118.jpg",
-    "widths": [963, 900, 560],
-    "width": 963,
-    "height": 1280
+    "source": "Pexels 29283878",
+    "licence": "Pexels License",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "sourceUrl": "https://www.pexels.com/photo/29283878/",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1750
   }
 }

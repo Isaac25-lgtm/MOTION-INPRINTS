@@ -39,10 +39,32 @@ test("portfolio images are genuine Motion photographs, never stock or mockups", 
   assert.doesNotMatch(work, /pexels/i);
 });
 
-test("pending permission is never treated as approved", () => {
-  const approved = manifest.filter((r) => r.permission === "approved");
-  assert.equal(approved.length, 0);
-  assert.doesNotMatch(work, /permission: "approved"/);
+test("only served photographs are approved, each by the owner's recorded decision", () => {
+  for (const r of manifest) {
+    if (r.permission !== "approved") continue;
+    assert.ok(r.public_derivatives.length > 0, r.original_filename);
+    assert.equal(r.publication, "launch-approved", r.original_filename);
+    assert.match(
+      r.public_use_reason,
+      /Owner approved publication on 2026-09-23/,
+    );
+  }
+  // Every served photograph is approved: none is still pending.
+  for (const r of manifest.filter((x) => x.public_derivatives.length > 0))
+    assert.equal(r.permission, "approved", r.original_filename);
+  // The four the owner kept off the site stay off it, with the reason.
+  for (const name of [
+    "IMG-20260920-WA0095.jpg",
+    "IMG-20260920-WA0118.jpg",
+    "IMG-20260921-WA0060.jpg",
+    "IMG-20260921-WA0076.jpg",
+  ]) {
+    const r = manifest.find((x) => x.original_filename === name);
+    assert.deepEqual(r.public_derivatives, [], name);
+    assert.equal(r.publication, "not-published", name);
+    assert.match(r.public_block_reason, /^Owner review 2026-09-23: /, name);
+    assert.ok(!Object.values(media).some((m) => m.source === name), name);
+  }
   // Each work-media source records its served derivatives in the manifest.
   for (const [slug, m] of Object.entries(media)) {
     const row = manifest.find((r) => r.original_filename === m.source);
@@ -53,15 +75,15 @@ test("pending permission is never treated as approved", () => {
   }
 });
 
-test("launch check lists pending images and blocks launch", () => {
+test("launch check passes the photographs but still blocks on configuration", () => {
   const run = spawnSync(process.execPath, ["scripts/launch-check.mjs"], {
     cwd: appRoot,
     encoding: "utf8",
     env: { PATH: process.env.PATH },
   });
   assert.equal(run.status, 1);
-  assert.match(run.stdout, /pending permission/);
-  assert.match(run.stdout, /IMG-20260920-WA0080\.jpg/);
+  assert.match(run.stdout, /0 pending permission/);
+  assert.doesNotMatch(run.stdout, /image IMG-/);
   assert.match(run.stdout, /NEXT_PUBLIC_SITE_URL/);
 });
 

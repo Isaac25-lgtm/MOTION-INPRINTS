@@ -15,10 +15,10 @@ import { featured, workLead, workSupport } from "./homepage";
  * confirmed by the owner, so no caption claims scope, outcome or date.
  *
  * permission:
- *   pending   publication permission not yet confirmed. Allowed in
- *             development; `npm run launch:check` lists every one of these
- *             and fails until each is approved or removed.
- *   approved  confirmed by the owner for public use.
+ *   approved  confirmed by the owner for public use (every served photograph,
+ *             2026-09-23; recorded in content/asset-manifest.json).
+ *   pending   not yet confirmed. `npm run check:photos` fails the Render
+ *             build while any served photograph is pending in the manifest.
  */
 
 export type WorkCategory =
@@ -67,7 +67,7 @@ function item(
     title,
     category,
     source: m.source,
-    permission: "pending",
+    permission: "approved",
     collection: extra.collection,
     frame: {
       base: `/media/work/${slug}`,
@@ -92,7 +92,7 @@ function shared(
     title,
     category,
     source: from.source,
-    permission: "pending",
+    permission: "approved",
     frame: from.frame,
   };
 }
@@ -313,12 +313,6 @@ export const workItems: WorkItem[] = [
     "events",
     "Octagonal Round 1 card with the Friends of Boxing logo beside boxing gloves.",
     { collection: "friends-of-boxing" },
-  ),
-  item(
-    "launch-display-board",
-    "Launch display board",
-    "events",
-    "Cut-out display board announcing the launch of the YALI Uganda Leadership and Mentorship Academy.",
   ),
   item(
     "roll-up-banners",
