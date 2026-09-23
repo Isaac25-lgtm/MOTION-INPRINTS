@@ -1,0 +1,73 @@
+/* Motion Imprints parent design tokens.
+   Typography is Inter Tight (display) and Inter (body), loaded by the root
+   layout through next/font. Colour values were measured for contrast; see
+   docs/execution/01-contrast-audit.md. */
+
+:root {
+  /* Brand */
+  --motion-blue: #2c9de3; /* the supplied logo blue: fills and dark grounds */
+  --motion-blue-text: #14689c; /* small blue text on paper, measured 5.39:1 */
+  --motion-blue-deep: #11557f; /* solid blue grounds */
+
+  /* Surfaces */
+  --ink: #11151b;
+  --ink-2: #1a1f27;
+  --paper: #f6f2ea;
+  --paper-2: #ece6da;
+  --white: #ffffff;
+  --navy: #07131f;
+
+  /* Text and rules */
+  --muted: #4a453e; /* body text on paper, measured 8.5:1 */
+  --line: rgba(17, 21, 27, 0.14);
+  --line-strong: rgba(17, 21, 27, 0.28);
+
+  /* Focus: dark ring plus a light gap, so it reads on light, image and dark */
+  --focus: var(--ink);
+  --focus-gap: var(--paper);
+
+  --font-display: "Inter Tight", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --step--1: 0.75rem;
+  --step-0: 1.0625rem;
+  --step-1: clamp(1.05rem, 1.25vw, 1.25rem);
+  --step-2: 1.45rem;
+  --step-3: clamp(1.6rem, 2vw, 2.1rem);
+  --step-4: clamp(2.05rem, 3.3vw, 3.5rem);
+  --step-5: clamp(2.35rem, 4.6vw, 5rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --space-6: 4rem;
+  --space-7: clamp(3.5rem, 6vw, 6rem);
+  --space-8: clamp(4rem, 8vw, 7rem);
+
+  --gutter: clamp(18px, 4vw, 56px);
+  --gap: clamp(12px, 1.3vw, 18px);
+  --container: 1440px;
+  --container-narrow: 46rem;
+
+  --radius-sm: 3px;
+  --header-h: 80px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 200ms;
+  --duration-med: 420ms;
+}
+
+@media (max-width: 700px) {
+  :root {
+    --header-h: 68px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0.01ms;
+    --duration-med: 0.01ms;
+  }
+}

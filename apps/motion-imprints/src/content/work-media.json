@@ -1,0 +1,194 @@
+{
+  "illuminated-shop-sign": {
+    "source": "IMG-20260920-WA0080.jpg",
+    "widths": [1020, 900, 560],
+    "width": 1020,
+    "height": 768
+  },
+  "fascia-at-night": {
+    "source": "IMG-20260920-WA0083.jpg",
+    "widths": [1020, 900, 560],
+    "width": 1020,
+    "height": 584
+  },
+  "shop-front-fascia": {
+    "source": "IMG-20260920-WA0034.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "street-fascia-boards": {
+    "source": "IMG-20260920-WA0114.jpg",
+    "widths": [1280, 900, 560],
+    "width": 1280,
+    "height": 963
+  },
+  "dimensional-fascia": {
+    "source": "IMG-20260920-WA0099.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "lightbox-sign": {
+    "source": "IMG-20260921-WA0145.jpg",
+    "widths": [1170, 900, 560],
+    "width": 1170,
+    "height": 1534
+  },
+  "cut-out-logo-sign": {
+    "source": "IMG-20260921-WA0186.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 788
+  },
+  "blade-sign": {
+    "source": "IMG-20260920-WA0111.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "wall-lettering": {
+    "source": "IMG-20260920-WA0078.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "reception-wall-graphic": {
+    "source": "IMG-20260920-WA0061.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1842
+  },
+  "printed-labels": {
+    "source": "IMG-20260921-WA0088.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "business-cards": {
+    "source": "IMG-20260921-WA0092.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "guest-book": {
+    "source": "IMG-20260921-WA0249.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1718
+  },
+  "framed-typographic-print": {
+    "source": "IMG-20260920-WA0073.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 2090
+  },
+  "framed-art-print": {
+    "source": "IMG-20260921-WA0099.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "branded-flasks": {
+    "source": "IMG-20260921-WA0049.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "embroidered-caps": {
+    "source": "IMG-20260921-WA0083.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "branded-notebook": {
+    "source": "IMG-20260921-WA0073.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "polo-and-caps": {
+    "source": "IMG-20260921-WA0172.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1865
+  },
+  "umbrella-and-flask": {
+    "source": "IMG-20260921-WA0232.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1892
+  },
+  "keyrings": {
+    "source": "IMG-20260921-WA0233.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 788
+  },
+  "product-label": {
+    "source": "IMG-20260921-WA0201.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1642
+  },
+  "soap-boxes": {
+    "source": "IMG-20260920-WA0084.jpg",
+    "widths": [768, 560],
+    "width": 768,
+    "height": 1020
+  },
+  "bottle-labels": {
+    "source": "IMG-20260920-WA0086.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "printed-tote-bags": {
+    "source": "IMG-20260921-WA0160.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1865
+  },
+  "branded-carrier-bags": {
+    "source": "IMG-20260920-WA0106.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "event-backdrop": {
+    "source": "IMG-20260921-WA0098.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "event-passes": {
+    "source": "IMG-20260921-WA0065.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "launch-display-board": {
+    "source": "IMG-20260920-WA0095.jpg",
+    "widths": [1280, 900, 560],
+    "width": 1280,
+    "height": 720
+  },
+  "roll-up-banners": {
+    "source": "IMG-20260920-WA0098.jpg",
+    "widths": [720, 560],
+    "width": 720,
+    "height": 947
+  },
+  "round-card": {
+    "source": "IMG-20260920-WA0054.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "feather-flag": {
+    "source": "IMG-20260920-WA0085.jpg",
+    "widths": [720, 560],
+    "width": 720,
+    "height": 1280
+  }
+}

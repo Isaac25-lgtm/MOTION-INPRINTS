@@ -1,0 +1,80 @@
+/* Motion Imprints Technologies design tokens (owner decision OD-05).
+   Direction: hugamara.com's visual language, as the owner asked: white
+   sections, near-black bands, navy headings, grey body text, Montserrat, one
+   warm accent, photography and video everywhere. Content and imagery are
+   our own. Colour pairs were measured; see docs/execution/12. */
+
+:root {
+  /* Accent: full strength for large type, marks and fills; the darker text
+     tone for small text on white (4.5:1). */
+  --accent: #ff6216;
+  --accent-text: #c2410c;
+  --motion-blue: #2c9de3;
+
+  --white: #ffffff;
+  --grey: #f1f1f1;
+  --grey-2: #e6e6e6;
+  --black: #0f0f0f;
+  --black-2: #17191c;
+  --navy: #102136;
+
+  --text: #4d5d6d; /* body on white, 6.3:1 */
+  --text-on-dark: #d6d9dd;
+  --line: rgba(16, 33, 54, 0.12);
+  --line-dark: rgba(255, 255, 255, 0.14);
+
+  /* Aliases used by the form and assistant styles. */
+  --stone: var(--white);
+  --stone-2: var(--grey-2);
+  --ink: var(--black);
+  --muted: var(--text);
+  --line-strong: rgba(16, 33, 54, 0.3);
+  --blue-text: var(--accent-text);
+  --blue-deep: var(--navy);
+  --signal: var(--accent);
+  --navy-2: #1d2024;
+  --on-navy: var(--white);
+  --on-navy-muted: var(--text-on-dark);
+  --radius: 0;
+  --radius-lg: 4px;
+
+  --focus: var(--navy);
+  --focus-gap: var(--white);
+
+  --font: var(--font-montserrat), "Montserrat", system-ui, sans-serif;
+  --font-mono: var(--font-mono-src), ui-monospace, monospace;
+  /* Names the interface screenshots expect. */
+  --font-display: var(--font);
+  --font-body: var(--font);
+
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.125rem;
+  --step-2: clamp(1.25rem, 1.6vw, 1.5rem);
+  --step-3: clamp(1.6rem, 2.4vw, 2rem);
+  --step-4: clamp(2rem, 3.4vw, 3rem);
+  --step-5: clamp(2.6rem, 5.6vw, 4.5rem);
+
+  --section: clamp(64px, 8vw, 112px);
+  --gutter: clamp(20px, 5vw, 76px);
+  --gap: clamp(14px, 1.6vw, 24px);
+  --container: 1290px;
+
+  --header-h: 96px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 200ms;
+  --duration-med: 480ms;
+}
+
+@media (max-width: 900px) {
+  :root {
+    --header-h: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0.01ms;
+    --duration-med: 0.01ms;
+  }
+}

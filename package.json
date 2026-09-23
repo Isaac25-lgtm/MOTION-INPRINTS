@@ -1,0 +1,28 @@
+{
+  "name": "motion-websites",
+  "private": true,
+  "workspaces": [
+    "apps/motion-imprints",
+    "apps/motion-technologies"
+  ],
+  "scripts": {
+    "dev:imprints": "npm run dev -w motion-imprints",
+    "dev:tech": "npm run dev -w motion-technologies",
+    "build": "npm run build --workspaces",
+    "build:imprints": "npm run build -w motion-imprints",
+    "build:tech": "npm run build -w motion-technologies",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "node scripts/migrate.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "prettier": "^3.9.8"
+  }
+}

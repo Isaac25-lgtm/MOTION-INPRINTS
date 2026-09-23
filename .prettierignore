@@ -1,0 +1,21 @@
+node_modules
+.next
+assets/derived
+PICTURES
+docs/_orientation-sheets
+*.pdf
+*.md
+*.csv
+*.sha256
+package-lock.json
+
+# Generated proof output (written by scripts/capture-rescue-a2-proof.mjs)
+docs/phase-3-4-rescue/gate-a2/proof/*.json
+docs/phase-3-4-rescue/gate-a2/media-records.json
+docs/execution/*.json
+docs/phase-3-4-rescue/gate-a3/*.json
+apps/*/build-stale-sandbox/
+docs/execution/gate-c-proof/*.json
+docs/execution/phase-*-proof/*.json
+docs/execution/**/results.json
+docs/execution/*-proof/*.json

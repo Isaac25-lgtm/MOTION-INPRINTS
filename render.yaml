@@ -1,0 +1,75 @@
+# Render Blueprint: two independent web services from this workspace.
+# Secrets are declared with sync: false and entered in the Render dashboard;
+# nothing secret is committed. See docs/execution/13-production-hardening.md.
+services:
+  - type: web
+    name: motion-imprints
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build -w motion-imprints
+    startCommand: npm exec -w motion-imprints -- next start -p $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_TECHNOLOGIES_URL
+        sync: false
+      - key: ALLOW_INDEXING
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: NOTIFY_WEBHOOK_URL
+        sync: false
+      - key: MOTION_ASSISTANT_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_PHONE
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_WHATSAPP
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_HOURS
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_MAP_URL
+        sync: false
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+
+  - type: web
+    name: motion-technologies
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build -w motion-technologies
+    startCommand: npm exec -w motion-technologies -- next start -p $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_PARENT_URL
+        sync: false
+      - key: ALLOW_INDEXING
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: NOTIFY_WEBHOOK_URL
+        sync: false
+      - key: MOTION_ASSISTANT_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_PHONE
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_WHATSAPP
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_HOURS
+        sync: false
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"

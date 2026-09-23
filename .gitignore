@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+
+# Next.js / build
+.next/
+out/
+build/
+# Stale output owned by an earlier sandbox identity; cannot be deleted by the
+# current user. Safe to remove from an elevated shell.
+build-stale-sandbox/
+dist/
+*.tsbuildinfo
+
+# Environment secrets — keep tracked examples
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Logs and OS
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+coverage/
+
+# Generated image derivatives (never originals)
+assets/derived/
+
+# Temporary orientation contact sheets
+docs/_orientation-sheets/
+
+# Storyboard prototype source, deleted after proof; ignore if recreated
+tmp/
+
+# Certificates / keys
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Python bytecode from the asset scripts
+__pycache__/
+*.pyc
+
+# Immutable original photographs. Kept on the owner's disk only and never pushed:
+# the public repository must not carry them. They include official stamps,
+# political campaign material, private invitations and identifiable people, and
+# client work whose publication permission is still pending.
+PICTURES/
+
+# Kept on this computer only. GitHub carries just what the two sites need to
+# build, test and deploy: no prompts, handoffs, proofs or asset pipelines.
+/docs/
+/*.md
+!/README.md
+/*.docx
+/motion logo.pdf
+/scripts/*
+!/scripts/migrate.mjs
+apps/*/CLAUDE.md
+apps/*/AGENTS.md
+# Poster variants the site never requests (it uses the WebP poster).
+apps/motion-technologies/public/media/tech/video/*-poster-*.avif

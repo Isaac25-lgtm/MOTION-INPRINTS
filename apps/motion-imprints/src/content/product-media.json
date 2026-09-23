@@ -1,0 +1,86 @@
+{
+  "t-shirts": {
+    "source": "IMG-20260921-WA0174.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1668
+  },
+  "polo-shirts": {
+    "source": "IMG-20260921-WA0171.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1865
+  },
+  "reflective-vest": {
+    "source": "IMG-20260921-WA0058.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1860
+  },
+  "aprons": {
+    "source": "IMG-20260921-WA0156.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1051
+  },
+  "mugs": {
+    "source": "IMG-20260921-WA0060.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "wristbands": {
+    "source": "IMG-20260921-WA0059.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1636
+  },
+  "teardrop-flag": {
+    "source": "IMG-20260920-WA0096.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  },
+  "pvc-banner": {
+    "source": "IMG-20260921-WA0260.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1717
+  },
+  "round-lightbox": {
+    "source": "IMG-20260921-WA0267.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1493
+  },
+  "paper-bags": {
+    "source": "IMG-20260921-WA0076.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 2489
+  },
+  "flyers": {
+    "source": "IMG-20260921-WA0250.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 2489
+  },
+  "acrylic-awards": {
+    "source": "IMG-20260921-WA0090.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1054
+  },
+  "canvas-print": {
+    "source": "IMG-20260921-WA0048.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 787
+  },
+  "wayfinding-plates": {
+    "source": "IMG-20260920-WA0118.jpg",
+    "widths": [963, 900, 560],
+    "width": 963,
+    "height": 1280
+  }
+}

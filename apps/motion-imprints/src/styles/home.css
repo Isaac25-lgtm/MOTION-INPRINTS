@@ -1,0 +1,685 @@
+/* Motion Imprints homepage sections.
+   Shell, buttons, tags and type helpers live in app/globals.css. */
+
+/* ------------------------------------------------------------------ hero */
+
+.home-hero {
+  position: relative;
+  display: grid;
+  align-items: end;
+  min-height: min(calc(100svh - var(--header-h)), 860px);
+  background: #0c1016;
+  color: var(--paper);
+  overflow: hidden;
+}
+
+.home-hero__media {
+  position: absolute;
+  inset: 0;
+  /* The drift animation scales the image; clip it to its own box so it never
+     bleeds into the copy below on mobile. */
+  overflow: hidden;
+}
+
+.home-hero__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 11, 16, 0.86) 0%,
+      rgba(8, 11, 16, 0.72) 32%,
+      rgba(8, 11, 16, 0.54) 52%,
+      rgba(8, 11, 16, 0.26) 70%,
+      rgba(8, 11, 16, 0) 86%
+    ),
+    linear-gradient(0deg, rgba(8, 11, 16, 0.58) 0%, rgba(8, 11, 16, 0) 46%);
+  pointer-events: none;
+}
+
+.home-hero__copy {
+  position: relative;
+  z-index: 1;
+  width: min(var(--container), calc(100% - 2 * var(--gutter)));
+  margin: 0 auto;
+  padding: 96px 0 clamp(40px, 6vh, 72px);
+}
+
+.home-hero h1 {
+  max-width: 17.5em;
+  font-size: var(--step-5);
+  line-height: 1.02;
+  letter-spacing: -0.028em;
+}
+
+.home-hero h1 span {
+  display: block;
+}
+
+.home-hero__lede {
+  max-width: 34rem;
+  margin-top: 20px;
+  color: #ece7de;
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+.home-hero .actions {
+  margin-top: 28px;
+}
+
+/* On very wide screens the headline grows past the scrim and would reach the
+   bright ink, so the scrim reaches further right there. Measured, not assumed:
+   docs/execution/01-contrast-audit.md. */
+@media (min-width: 1600px) {
+  .home-hero__media::after {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(8, 11, 16, 0.9) 0%,
+        rgba(8, 11, 16, 0.82) 38%,
+        rgba(8, 11, 16, 0.66) 58%,
+        rgba(8, 11, 16, 0.34) 76%,
+        rgba(8, 11, 16, 0) 92%
+      ),
+      linear-gradient(0deg, rgba(8, 11, 16, 0.58) 0%, rgba(8, 11, 16, 0) 46%);
+  }
+}
+
+/* ------------------------------------------------------- capability rail */
+
+.home-rail {
+  position: relative;
+  height: 112px;
+  background: var(--ink);
+  color: var(--paper);
+  overflow: hidden;
+}
+
+.home-rail__viewport {
+  height: 100%;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+.home-rail__track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+}
+
+.home-rail__track ul {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.home-rail__track li {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  padding-right: 64px;
+}
+
+.home-rail__track span {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.4rem, 2.3vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.home-rail__track i {
+  width: 9px;
+  height: 9px;
+  background: var(--motion-blue);
+  transform: rotate(45deg);
+}
+
+.home-rail__static {
+  display: none;
+}
+
+@keyframes home-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* --------------------------------------------------------------- shared */
+
+.home-section {
+  padding: clamp(64px, 8vw, 104px) 0 clamp(56px, 6vw, 88px);
+}
+
+main > section {
+  scroll-margin-top: var(--header-h);
+}
+
+.home-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  align-items: end;
+  gap: 24px 48px;
+  margin-bottom: clamp(24px, 3vw, 40px);
+}
+
+.home-intro > p {
+  max-width: 34rem;
+  justify-self: end;
+  color: var(--muted);
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------- services mosaic */
+
+.home-services {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(2, clamp(300px, 28vw, 430px));
+  grid-template-areas:
+    "brand brand brand brand brand sign sign sign sign sign sign sign"
+    "brand brand brand brand brand wear wear wear wear pack pack pack";
+  gap: var(--gap);
+}
+
+.home-card--branding {
+  grid-area: brand;
+}
+.home-card--signage {
+  grid-area: sign;
+}
+.home-card--apparel {
+  grid-area: wear;
+}
+.home-card--packaging {
+  grid-area: pack;
+}
+
+a.home-card {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  color: var(--paper);
+  isolation: isolate;
+}
+
+.home-card .home-media {
+  position: absolute;
+  inset: 0;
+}
+
+.home-card img {
+  transition: transform 0.9s var(--ease);
+}
+
+.home-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    0deg,
+    rgba(8, 11, 16, 0.9) 0%,
+    rgba(8, 11, 16, 0.74) 26%,
+    rgba(8, 11, 16, 0.3) 46%,
+    rgba(8, 11, 16, 0) 64%
+  );
+  pointer-events: none;
+}
+
+/* The copy carries its own scrim so text keeps AA contrast at every card
+   size, not only where the card-wide fade happens to be dark. */
+.home-card__copy {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  padding: clamp(18px, 2vw, 28px);
+  background: linear-gradient(
+    0deg,
+    rgba(8, 11, 16, 0.94) 0%,
+    rgba(8, 11, 16, 0.88) 55%,
+    rgba(8, 11, 16, 0.62) 85%,
+    rgba(8, 11, 16, 0.32) 100%
+  );
+  text-shadow: 0 1px 12px rgba(8, 11, 16, 0.45);
+}
+
+.home-card__title {
+  color: inherit;
+  font-size: clamp(1.45rem, 2vw, 2.1rem);
+}
+
+.home-card__text {
+  max-width: 30rem;
+  color: #e6e1d8;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.home-card__link {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 6px;
+  color: #bfe3fa;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.home-card__link i {
+  font-style: normal;
+  transition: transform var(--duration-med) var(--ease);
+}
+
+.home-card:hover img {
+  transform: scale(1.035);
+}
+
+.home-card:hover .home-card__link i {
+  transform: translateX(4px);
+}
+
+/* -------------------------------------------------------------- featured */
+
+.home-featured {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  background: var(--paper-2);
+}
+
+.home-featured__media {
+  min-height: clamp(420px, 44vw, 680px);
+  overflow: hidden;
+}
+
+.home-featured__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 18px;
+  padding: clamp(32px, 5vw, 80px);
+}
+
+.home-featured__copy > p:not(.eyebrow) {
+  max-width: 28rem;
+  color: var(--muted);
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------- selected work */
+
+.home-work {
+  display: grid;
+  gap: var(--gap);
+}
+
+.home-work__row {
+  display: flex;
+  gap: var(--gap);
+}
+
+.home-work__pair {
+  display: contents;
+}
+
+/* Each item keeps its own aspect ratio and shares the row height, so no sign
+   or word is cropped in half. */
+.home-work__item {
+  flex: var(--ar) 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.home-work__frame {
+  aspect-ratio: var(--ar);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+
+.home-work__item img {
+  transition: transform 0.9s var(--ease);
+}
+
+.home-work__item:hover img {
+  transform: scale(1.03);
+}
+
+.home-work figcaption {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-work__more {
+  margin-top: 18px;
+}
+
+/* --------------------------------------------------------------- process */
+
+.home-section--process {
+  background: var(--white);
+}
+
+.home-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+.home-steps li {
+  position: relative;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.home-steps li::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  background: var(--motion-blue);
+  transform: rotate(45deg);
+}
+
+.home-steps__frame {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+
+.home-steps__index {
+  margin-top: 16px;
+  color: var(--motion-blue-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.home-steps h3 {
+  margin-top: 4px;
+  font-size: clamp(1.4rem, 1.8vw, 1.75rem);
+}
+
+.home-steps li > p:last-child {
+  max-width: 22rem;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------- cta */
+
+.home-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  min-height: clamp(380px, 32vw, 480px);
+  background: var(--motion-blue-deep);
+  color: var(--paper);
+}
+
+.home-cta__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 18px;
+  padding: clamp(40px, 5vw, 80px) clamp(24px, 4vw, 64px) clamp(40px, 5vw, 80px)
+    var(--gutter);
+}
+
+.home-cta__copy > p {
+  max-width: 30rem;
+  color: #e3eef6;
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+.home-cta__media {
+  min-height: 300px;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-hero__media img {
+    animation: home-drift 24s ease-in-out infinite alternate;
+  }
+
+  .home-rail__track {
+    animation: home-marquee 56s linear infinite;
+  }
+}
+
+@keyframes home-drift {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-rail {
+    height: auto;
+    min-height: 104px;
+  }
+
+  .home-rail__viewport,
+  .home-rail__sr {
+    display: none;
+  }
+
+  .home-rail__static {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 24px;
+    width: min(var(--container), calc(100% - 2 * var(--gutter)));
+    min-height: 104px;
+    margin-inline: auto;
+    padding: 18px 0;
+  }
+
+  .home-rail__static li {
+    font-family: var(--font-display), sans-serif;
+    font-size: clamp(1.15rem, 2vw, 1.6rem);
+    font-weight: 600;
+  }
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1024px) {
+  .home-services {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, clamp(280px, 40vw, 380px));
+    grid-template-areas:
+      "brand sign"
+      "wear pack";
+  }
+}
+
+@media (max-width: 900px) {
+  .home-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 36px;
+  }
+
+  .home-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .home-featured__media {
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@media (max-width: 800px) {
+  .home-cta {
+    grid-template-columns: 1fr;
+  }
+
+  .home-cta__copy {
+    padding: 44px var(--gutter);
+  }
+
+  .home-cta__media {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@media (max-width: 700px) {
+  .home-hero {
+    display: block;
+    min-height: 0;
+  }
+
+  .home-hero__media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    max-height: 62svh;
+  }
+
+  /* Reaches solid navy before the photograph ends, so the copy block below
+     continues the same surface and no edge crosses the heading. */
+  .home-hero__media::after {
+    background: linear-gradient(
+      0deg,
+      #0c1016 0%,
+      #0c1016 9%,
+      rgba(12, 16, 22, 0.55) 24%,
+      rgba(12, 16, 22, 0) 46%
+    );
+  }
+
+  .home-hero__copy {
+    margin-top: 0;
+    padding: 4px 0 44px;
+  }
+
+  .home-hero h1 {
+    font-size: clamp(1.85rem, 9.6vw, 2.6rem);
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+
+  .home-hero h1 span {
+    display: inline;
+  }
+
+  .home-hero .actions .btn {
+    flex: 1 1 140px;
+  }
+
+  /* Only the animated rail has a fixed height; the reduced-motion list wraps
+     onto several rows and must grow with them. */
+  @media (prefers-reduced-motion: no-preference) {
+    .home-rail {
+      height: 84px;
+    }
+  }
+
+  .home-rail__track li {
+    gap: 40px;
+    padding-right: 40px;
+  }
+
+  .home-intro {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .home-intro > p {
+    justify-self: start;
+  }
+
+  .home-services {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    grid-template-areas:
+      "sign"
+      "brand"
+      "wear"
+      "pack";
+  }
+
+  .home-card--signage,
+  .home-card--branding,
+  .home-card--apparel,
+  .home-card--packaging {
+    aspect-ratio: 4 / 3;
+  }
+
+  .home-card__copy {
+    gap: 4px;
+    padding: 16px;
+  }
+
+  .home-card__title {
+    font-size: 1.35rem;
+  }
+
+  .home-card__text {
+    display: none;
+  }
+
+  .home-work__row--lead {
+    flex-direction: column;
+  }
+
+  .home-work__row--lead .home-work__item {
+    flex: none;
+  }
+
+  .home-work__row--support {
+    display: grid;
+    gap: 24px;
+  }
+
+  .home-work__pair {
+    display: flex;
+    gap: var(--gap);
+  }
+
+  .home-work figcaption {
+    font-size: 0.72rem;
+  }
+
+  .home-steps {
+    column-gap: 12px;
+  }
+
+  .home-steps h3 {
+    font-size: 1.25rem;
+  }
+
+  .home-steps li > p:last-child {
+    font-size: 0.9rem;
+  }
+}

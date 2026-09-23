@@ -1,0 +1,234 @@
+{
+  "photos": {
+    "who-we-are": {
+      "base": "/media/tech/photos/who-we-are",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "Two colleagues working at a laptop in an office, a dashboard on the screen behind them.",
+      "source": "Pexels 9301295"
+    },
+    "health": {
+      "base": "/media/tech/photos/health",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A doctor using a tablet in a clinic.",
+      "source": "Pexels 5452188"
+    },
+    "data": {
+      "base": "/media/tech/photos/data",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1392,
+      "alt": "Hands on a laptop keyboard with a data dashboard on screen.",
+      "source": "Pexels 38246349"
+    },
+    "finance": {
+      "base": "/media/tech/photos/finance",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A phone and a card terminal on a counter during a payment.",
+      "source": "Pexels 5332483"
+    },
+    "education": {
+      "base": "/media/tech/photos/education",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1218,
+      "alt": "Students in school uniform studying together at a desk.",
+      "source": "Pexels 34162714"
+    },
+    "retail": {
+      "base": "/media/tech/photos/retail",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1202,
+      "alt": "A shop counter with a point-of-sale screen and a smiling customer.",
+      "source": "Pexels 8476590"
+    },
+    "digital": {
+      "base": "/media/tech/photos/digital",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A woman in a red top using her smartphone.",
+      "source": "Pexels 34996541"
+    },
+    "approach": {
+      "base": "/media/tech/photos/approach",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A colleague explaining a plan to two others at a laptop.",
+      "source": "Pexels 9301316"
+    },
+    "real-work": {
+      "base": "/media/tech/photos/real-work",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "Two professionals discussing work across their laptops.",
+      "source": "Pexels 7993903"
+    },
+    "connected": {
+      "base": "/media/tech/photos/connected",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A team gathered around a laptop in a bright office.",
+      "source": "Pexels 3894376"
+    },
+    "secure": {
+      "base": "/media/tech/photos/secure",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "Two colleagues reviewing work closely on a laptop.",
+      "source": "Pexels 9487243"
+    },
+    "closing": {
+      "base": "/media/tech/photos/closing",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "Three colleagues celebrating with a high five in an office.",
+      "source": "Pexels 30688588"
+    }
+  },
+  "devices": {
+    "laptop-me": {
+      "base": "/media/tech/devices/laptop-me",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1279,
+      "alt": "A laptop in a dark room showing an M&E results dashboard with sample data.",
+      "source": "Pexels 12883029 + own screen"
+    },
+    "laptop-business": {
+      "base": "/media/tech/devices/laptop-business",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "Hands typing on a laptop showing a business owner's dashboard with sample data.",
+      "source": "Pexels 6611936 + own screen"
+    },
+    "laptop-health": {
+      "base": "/media/tech/devices/laptop-health",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A laptop on a sofa showing an outpatient queue with sample data.",
+      "source": "Pexels 12936940 + own screen"
+    },
+    "laptop-sacco": {
+      "base": "/media/tech/devices/laptop-sacco",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1279,
+      "alt": "A laptop showing a SACCO loans pipeline with sample data.",
+      "source": "Pexels 12883029 + own screen"
+    },
+    "laptop-education": {
+      "base": "/media/tech/devices/laptop-education",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A laptop showing school fees and attendance with sample data.",
+      "source": "Pexels 12936940 + own screen"
+    },
+    "laptop-pos": {
+      "base": "/media/tech/devices/laptop-pos",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "Hands on a laptop showing a point-of-sale counter screen with sample data.",
+      "source": "Pexels 6611936 + own screen"
+    },
+    "laptop-web": {
+      "base": "/media/tech/devices/laptop-web",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A laptop showing a business website design with sample content.",
+      "source": "Pexels 12936940 + own screen"
+    },
+    "laptop-marketing": {
+      "base": "/media/tech/devices/laptop-marketing",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A laptop showing a launch content calendar with sample data.",
+      "source": "Pexels 6611936 + own screen"
+    },
+    "laptop-analytics": {
+      "base": "/media/tech/devices/laptop-analytics",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1279,
+      "alt": "A laptop showing an indicator trend with data-quality flags and sample data.",
+      "source": "Pexels 12883029 + own screen"
+    },
+    "laptop-custom": {
+      "base": "/media/tech/devices/laptop-custom",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A laptop showing a project board and automations with sample data.",
+      "source": "Pexels 12936940 + own screen"
+    },
+    "laptop-security": {
+      "base": "/media/tech/devices/laptop-security",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A laptop showing a role permission matrix and audit log with sample data.",
+      "source": "Pexels 6611936 + own screen"
+    },
+    "phone-field": {
+      "base": "/media/tech/devices/phone-field",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 1200,
+      "alt": "A hand holding a phone showing a household survey form with sample data.",
+      "source": "Pexels 35052818 + own screen"
+    },
+    "phone-shop": {
+      "base": "/media/tech/devices/phone-shop",
+      "widths": [1800, 1200, 700],
+      "width": 1800,
+      "height": 2700,
+      "alt": "A hand holding a phone showing a shop owner's daily sales with sample data.",
+      "source": "Pexels 6373129 + own screen"
+    }
+  },
+  "videos": {
+    "hero-wide": {
+      "src": "/media/tech/video/hero-wide.mp4",
+      "bytes": 1323199,
+      "width": 1600,
+      "height": 900,
+      "poster": {
+        "base": "/media/tech/video/hero-wide-poster",
+        "widths": [1600],
+        "width": 1600,
+        "height": 900
+      },
+      "source": "video-9365167-hd_1920_1080_25fps.mp4"
+    },
+    "hero-tall": {
+      "src": "/media/tech/video/hero-tall.mp4",
+      "bytes": 896900,
+      "width": 720,
+      "height": 1280,
+      "poster": {
+        "base": "/media/tech/video/hero-tall-poster",
+        "widths": [720],
+        "width": 720,
+        "height": 1280
+      },
+      "source": "video-9365198-hd_1080_1920_25fps.mp4"
+    }
+  }
+}

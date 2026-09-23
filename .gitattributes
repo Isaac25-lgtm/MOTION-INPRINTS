@@ -1,0 +1,13 @@
+# Keep LF in the working copy on every platform so Prettier's format check
+# passes after a fresh Windows checkout.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.docx binary

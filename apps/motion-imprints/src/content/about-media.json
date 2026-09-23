@@ -1,0 +1,20 @@
+{
+  "wide-format-printing": {
+    "source": "IMG-20260920-WA0052.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1991
+  },
+  "fascia-fabrication": {
+    "source": "IMG-20260921-WA0277.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1422
+  },
+  "flatbed-printing": {
+    "source": "IMG-20260921-WA0071.jpg",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1414
+  }
+}
