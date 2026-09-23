@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     // Output from an earlier sandbox identity; kept only because the current
     // user cannot delete it. Not part of the source.
-    "build-stale-sandbox/**",
+    "build-stale-*/**",
     "next-env.d.ts",
   ]),
 ]);

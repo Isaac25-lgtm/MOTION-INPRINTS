@@ -30,5 +30,5 @@
     "build/types/**/*.ts",
     "build/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "build-stale-sandbox"]
+  "exclude": ["node_modules", "build-stale-*"]
 }

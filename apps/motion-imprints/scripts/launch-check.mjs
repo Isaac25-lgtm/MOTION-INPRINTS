@@ -6,6 +6,10 @@
 //
 //   npm run launch:check -w motion-imprints
 //
+// With --photos it checks only the photograph permissions. The Render build
+// runs that mode (npm run check:photos) before building, so a deploy fails
+// while any served photograph is still pending, whatever else is configured.
+//
 // It never treats "pending" as approved. To clear an image, the owner confirms
 // permission and its manifest row is changed to permission "approved" and
 // publication "launch-approved" (or the image is removed from the site).
@@ -18,6 +22,7 @@ const manifest = JSON.parse(
   readFileSync(join(appRoot, "content/asset-manifest.json"), "utf8"),
 );
 
+const photosOnly = process.argv.includes("--photos");
 const blockers = [];
 
 // 1. Every genuine photograph the site serves needs confirmed permission.
@@ -38,23 +43,25 @@ for (const row of pending) {
 }
 
 // 2. Production configuration must be real, not the local defaults.
-const env = process.env;
-const siteUrl = env.NEXT_PUBLIC_SITE_URL ?? "";
-if (!/^https:\/\//.test(siteUrl) || /localhost/.test(siteUrl))
-  blockers.push("NEXT_PUBLIC_SITE_URL is not a public https domain");
-const techUrl = env.NEXT_PUBLIC_TECHNOLOGIES_URL ?? "";
-if (!/^https:\/\//.test(techUrl) || /localhost/.test(techUrl))
-  blockers.push("NEXT_PUBLIC_TECHNOLOGIES_URL is not a public https domain");
-if (!env.NEXT_PUBLIC_CONTACT_PHONE && !env.NEXT_PUBLIC_CONTACT_EMAIL)
-  blockers.push(
-    "no verified public contact channel (NEXT_PUBLIC_CONTACT_PHONE or NEXT_PUBLIC_CONTACT_EMAIL)",
-  );
-if (env.ALLOW_INDEXING !== "true")
-  blockers.push(
-    "ALLOW_INDEXING is not true; search engines are told to stay out",
-  );
-if (!env.DATABASE_URL)
-  blockers.push("DATABASE_URL is not set; quote requests cannot be stored");
+if (!photosOnly) {
+  const env = process.env;
+  const siteUrl = env.NEXT_PUBLIC_SITE_URL ?? "";
+  if (!/^https:\/\//.test(siteUrl) || /localhost/.test(siteUrl))
+    blockers.push("NEXT_PUBLIC_SITE_URL is not a public https domain");
+  const techUrl = env.NEXT_PUBLIC_TECHNOLOGIES_URL ?? "";
+  if (!/^https:\/\//.test(techUrl) || /localhost/.test(techUrl))
+    blockers.push("NEXT_PUBLIC_TECHNOLOGIES_URL is not a public https domain");
+  if (!env.NEXT_PUBLIC_CONTACT_PHONE && !env.NEXT_PUBLIC_CONTACT_EMAIL)
+    blockers.push(
+      "no verified public contact channel (NEXT_PUBLIC_CONTACT_PHONE or NEXT_PUBLIC_CONTACT_EMAIL)",
+    );
+  if (env.ALLOW_INDEXING !== "true")
+    blockers.push(
+      "ALLOW_INDEXING is not true; search engines are told to stay out",
+    );
+  if (!env.DATABASE_URL)
+    blockers.push("DATABASE_URL is not set; quote requests cannot be stored");
+}
 
 console.log(
   `Launch check: ${served.length} served originals, ${pending.length} pending permission.`,
@@ -62,7 +69,14 @@ console.log(
 if (blockers.length) {
   console.log(`\n${blockers.length} blocker(s):`);
   for (const b of blockers) console.log(`  - ${b}`);
+  if (photosOnly)
+    console.log(
+      "\nDeploy stopped. Approve each photograph in content/asset-manifest.json" +
+        ' (permission "approved", publication "launch-approved") or remove it from the site.',
+    );
   process.exitCode = 1;
 } else {
-  console.log("No launch blockers.");
+  console.log(
+    photosOnly ? "All served photographs are approved." : "No launch blockers.",
+  );
 }

@@ -14,7 +14,7 @@ docs/phase-3-4-rescue/gate-a2/proof/*.json
 docs/phase-3-4-rescue/gate-a2/media-records.json
 docs/execution/*.json
 docs/phase-3-4-rescue/gate-a3/*.json
-apps/*/build-stale-sandbox/
+apps/*/build-stale-*/
 docs/execution/gate-c-proof/*.json
 docs/execution/phase-*-proof/*.json
 docs/execution/**/results.json

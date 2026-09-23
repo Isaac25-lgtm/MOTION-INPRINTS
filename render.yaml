@@ -6,7 +6,9 @@ services:
     name: motion-imprints
     runtime: node
     plan: starter
-    buildCommand: npm ci && npm run build -w motion-imprints
+    # The photo gate fails the deploy while any served photograph still has
+    # permission pending (see apps/motion-imprints/scripts/launch-check.mjs).
+    buildCommand: npm ci && npm run check:photos -w motion-imprints && npm run build -w motion-imprints
     startCommand: npm exec -w motion-imprints -- next start -p $PORT
     healthCheckPath: /
     envVars:

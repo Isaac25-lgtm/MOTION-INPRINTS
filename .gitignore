@@ -7,7 +7,7 @@ out/
 build/
 # Stale output owned by an earlier sandbox identity; cannot be deleted by the
 # current user. Safe to remove from an elevated shell.
-build-stale-sandbox/
+build-stale-*/
 dist/
 *.tsbuildinfo
 

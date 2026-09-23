@@ -8,8 +8,9 @@
     "start": "next start --port 3000",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/smoke.test.mjs tests/homepage.test.mjs tests/work.test.mjs tests/catalogue.test.mjs tests/quote.test.mjs tests/assistant.test.mjs",
-    "launch:check": "node scripts/launch-check.mjs"
+    "test": "node --test tests/smoke.test.mjs tests/homepage.test.mjs tests/work.test.mjs tests/catalogue.test.mjs tests/quote.test.mjs tests/assistant.test.mjs tests/request-guard.test.mjs",
+    "launch:check": "node scripts/launch-check.mjs",
+    "check:photos": "node scripts/launch-check.mjs --photos"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

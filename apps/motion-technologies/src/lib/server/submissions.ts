@@ -7,6 +7,7 @@ import {
   type LeadRepository,
 } from "@/lib/leads/repository";
 import { MAX_BODY_BYTES } from "@/lib/leads/validate";
+import { isForeignOrigin, readLimitedBody } from "./request-body";
 
 /**
  * Server-only wiring for form submissions: database, rate limits,
@@ -94,7 +95,7 @@ export async function guard(
 ): Promise<{ body: unknown } | { response: Response }> {
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");
-  if (origin && host && new URL(origin).host !== host)
+  if (isForeignOrigin(origin, host))
     return { response: json(403, { error: "forbidden" }) };
 
   if (!request.headers.get("content-type")?.includes("application/json"))
@@ -107,11 +108,16 @@ export async function guard(
   if (!limiter.check(clientKey(request)))
     return { response: json(429, { error: "rate_limited" }) };
 
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES)
-    return { response: json(413, { error: "too_large" }) };
+  const read = await readLimitedBody(request, MAX_BODY_BYTES);
+  if (!read.ok)
+    return {
+      response:
+        read.error === "too_large"
+          ? json(413, { error: "too_large" })
+          : json(400, { error: "invalid_json" }),
+    };
   try {
-    return { body: JSON.parse(raw) };
+    return { body: JSON.parse(read.text) };
   } catch {
     return { response: json(400, { error: "invalid_json" }) };
   }
