@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { JetBrains_Mono, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { indexingAllowed, site } from "@/lib/site";
 import "./globals.css";
 
-const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+// Fonts ship with the site (SIL Open Font License, see src/fonts) so a build
+// never depends on reaching Google Fonts. Latin subset, variable weight.
+const montserrat = localFont({
+  src: "../fonts/Montserrat-latin.woff2",
+  weight: "400 700",
   variable: "--font-montserrat",
   display: "swap",
 });
 
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
+const mono = localFont({
+  src: "../fonts/JetBrainsMono-latin.woff2",
+  weight: "400 500",
   variable: "--font-mono-src",
   display: "swap",
 });

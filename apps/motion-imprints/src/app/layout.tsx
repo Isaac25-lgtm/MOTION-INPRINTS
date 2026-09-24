@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import { defaultOgImages } from "@/lib/og";
 import { site } from "@/lib/site";
 import "./globals.css";
 
-const interTight = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-display",
+// Fonts ship with the site (SIL Open Font License, see src/fonts) so a build
+// never depends on reaching Google Fonts. Latin subset, variable weight.
+const interTight = localFont({
+  src: "../fonts/InterTight-latin.woff2",
+  weight: "600 700",
+  variable: "--font-display-src",
   display: "swap",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
+const inter = localFont({
+  src: "../fonts/Inter-latin.woff2",
+  weight: "400 600",
+  variable: "--font-body-src",
   display: "swap",
 });
 

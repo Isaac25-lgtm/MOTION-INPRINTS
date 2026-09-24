@@ -1,6 +1,6 @@
 /* Motion Imprints parent design tokens.
    Typography is Inter Tight (display) and Inter (body), loaded by the root
-   layout through next/font. Colour values were measured for contrast; see
+   layout through next/font/local (bundled, see src/fonts). Colour values were measured for contrast; see
    docs/execution/01-contrast-audit.md. */
 
 :root {
@@ -26,8 +26,10 @@
   --focus: var(--ink);
   --focus-gap: var(--paper);
 
-  --font-display: "Inter Tight", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  /* The bundled fonts (next/font/local) register under generated names, so
+     the tokens point at their variables rather than at family names. */
+  --font-display: var(--font-display-src), system-ui, sans-serif;
+  --font-body: var(--font-body-src), system-ui, sans-serif;
 
   --step--1: 0.75rem;
   --step-0: 1.0625rem;

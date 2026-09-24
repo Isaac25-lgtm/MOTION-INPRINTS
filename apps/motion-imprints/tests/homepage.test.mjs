@@ -51,8 +51,9 @@ test("the rejected homepage is gone, not hidden at another route", () => {
 
 test("typography is Inter Tight and Inter, with Syne and Outfit removed", () => {
   const layout = read("src/app/layout.tsx");
-  assert.match(layout, /Inter_Tight/);
-  assert.match(layout, /Inter\b/);
+  // Bundled with the site (next/font/local), not fetched at build time.
+  assert.match(layout, /fonts\/InterTight-latin\.woff2/);
+  assert.match(layout, /fonts\/Inter-latin\.woff2/);
   assert.doesNotMatch(layout, /Syne|Outfit/);
   assert.doesNotMatch(read("src/styles/tokens.css"), /Syne|Outfit/);
   // Fonts load once, in the root layout only.
