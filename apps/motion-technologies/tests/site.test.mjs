@@ -152,10 +152,16 @@ test("every solution route is statically generated and unknown slugs 404", () =>
   );
 });
 
-test("the Technologies logo lockup is the supplied artwork, never an isolated mark", () => {
-  assert.equal(existsSync(join(appRoot, "public/brand/logo-trim.png")), true);
-  const brand = read("src/components/Brand.tsx");
-  assert.match(brand, /logo-trim\.png/);
+test("the Technologies lockup keeps the supplied wordmark and never isolates the mark", () => {
+  // Supplied "Motion i" wordmark with SYSTEMS . DATA . DIGITAL in place of the
+  // print tagline (OD-07); the parent keeps DESIGN . PRINT . BRAND.
+  assert.equal(
+    existsSync(join(appRoot, "public/brand/logo-technologies.png")),
+    true,
+  );
+  assert.match(read("src/components/Brand.tsx"), /logo-technologies\.png/);
+  assert.match(read("src/components/Footer.tsx"), /logo-technologies\.png/);
+  assert.equal(existsSync(join(appRoot, "public/brand/logo-trim.png")), false);
   assert.equal(
     readdirSync(join(appRoot, "public/brand")).some((f) =>
       /mark|icon-i/i.test(f),

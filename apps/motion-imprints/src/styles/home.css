@@ -553,33 +553,57 @@ a.home-card {
 }
 
 @media (max-width: 700px) {
+  /* Phones: the square photograph is shown as it is, and the copy sits below
+     it on paper. No scrim is needed, so there is no fade into a dark block. */
   .home-hero {
     display: block;
     min-height: 0;
+    background: var(--paper);
+    color: var(--ink);
   }
 
   .home-hero__media {
     position: relative;
     width: 100%;
-    aspect-ratio: 4 / 5;
-    max-height: 62svh;
+    aspect-ratio: 1 / 1;
   }
 
-  /* Reaches solid navy before the photograph ends, so the copy block below
-     continues the same surface and no edge crosses the heading. */
   .home-hero__media::after {
-    background: linear-gradient(
-      0deg,
-      #0c1016 0%,
-      #0c1016 9%,
-      rgba(12, 16, 22, 0.55) 24%,
-      rgba(12, 16, 22, 0) 46%
-    );
+    content: none;
   }
 
   .home-hero__copy {
     margin-top: 0;
-    padding: 4px 0 44px;
+    padding: 28px 0 40px;
+  }
+
+  .home-hero__lede {
+    margin-top: 14px;
+    color: var(--muted);
+  }
+
+  .home-hero a.btn--light {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .home-hero a.btn--light:hover {
+    background: var(--motion-blue-deep);
+  }
+
+  .home-hero a.btn--outline {
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  .home-hero a.btn--outline:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .home-hero.on-dark :focus-visible {
+    outline-color: var(--ink);
+    box-shadow: 0 0 0 5px var(--paper);
   }
 
   .home-hero h1 {
@@ -629,16 +653,39 @@ a.home-card {
       "pack";
   }
 
-  .home-card--signage,
-  .home-card--branding,
-  .home-card--apparel,
-  .home-card--packaging {
+  /* Phones: the full photograph, then the title and link on paper below it,
+     so the images stay vivid and no dark band covers them. */
+  a.home-card {
+    overflow: visible;
+    border-radius: 0;
+    background: none;
+    color: var(--ink);
+  }
+
+  .home-card .home-media {
+    position: relative;
+    inset: auto;
+    height: auto;
     aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
+  }
+
+  .home-card .home-media img {
+    position: absolute;
+    inset: 0;
+  }
+
+  .home-card::after {
+    content: none;
   }
 
   .home-card__copy {
+    position: static;
     gap: 4px;
-    padding: 16px;
+    padding: 14px 0 6px;
+    background: none;
+    text-shadow: none;
   }
 
   .home-card__title {
@@ -646,7 +693,12 @@ a.home-card {
   }
 
   .home-card__text {
-    display: none;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .home-card__link {
+    color: var(--motion-blue-text);
   }
 
   .home-work__row--lead {

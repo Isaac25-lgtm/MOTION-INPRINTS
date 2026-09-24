@@ -9,7 +9,7 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 test("technologies env example uses local development defaults only", () => {
   const example = readFileSync(join(appRoot, ".env.example"), "utf8");
   assert.match(example, /NEXT_PUBLIC_SITE_URL=http:\/\/localhost:3001/);
-  assert.match(example, /NEXT_PUBLIC_PARENT_URL=http:\/\/localhost:3000/);
+  assert.doesNotMatch(example, /NEXT_PUBLIC_PARENT_URL/);
   assert.doesNotMatch(example, /https:\/\//);
 });
 
@@ -21,19 +21,31 @@ test("technologies package exposes independent scripts", () => {
   }
 });
 
-test("technologies site config centralizes the parent destination", () => {
+test("the Technologies site stands on its own (OD-07)", () => {
   const source = readFileSync(join(appRoot, "src/lib/site.ts"), "utf8");
-  assert.match(source, /NEXT_PUBLIC_PARENT_URL/);
-  assert.match(source, /localhost:3000/);
-});
-
-test("the homepage states the parent relationship and links back", () => {
-  const home = readFileSync(join(appRoot, "src/app/(site)/page.tsx"), "utf8");
-  const header = readFileSync(
-    join(appRoot, "src/components/Header.tsx"),
-    "utf8",
+  assert.match(source, /name: "Motion Imprints Technologies"/);
+  assert.doesNotMatch(
+    source,
+    /parentName|parentUrl|relationship|NEXT_PUBLIC_PARENT_URL/,
   );
-  assert.match(home, /technology division of \{site\.parentName\}/);
-  assert.match(home, /site\.parentUrl/);
-  assert.match(header, /site\.parentUrl/);
+  // No page, component or assistant prompt presents it as a division or
+  // links back to a parent company.
+  const files = [
+    "src/app/(site)/page.tsx",
+    "src/app/(site)/about/page.tsx",
+    "src/app/(site)/contact/page.tsx",
+    "src/components/Header.tsx",
+    "src/components/MobileNav.tsx",
+    "src/components/Footer.tsx",
+    "src/content/solutions.ts",
+    "src/lib/assistant/knowledge.ts",
+  ];
+  for (const f of files) {
+    const text = readFileSync(join(appRoot, f), "utf8");
+    assert.doesNotMatch(
+      text,
+      /division of|parent company|Parent company|parentOrganization|site\.parent/,
+      f,
+    );
+  }
 });

@@ -1,6 +1,7 @@
 # Render Blueprint: two independent web services from this workspace, one per
-# domain. The Blueprint asks only for each site's public address and the other
-# site's address (for the cross-links); they stay editable in the dashboard.
+# domain. The Blueprint asks only for public addresses: each site's own, plus
+# the Technologies address for the Motion Imprints "Technologies" link. They
+# stay editable in the dashboard.
 #
 # Optional settings are added later in each service's Environment tab when the
 # owner has them; nothing secret is ever committed. The code works without
@@ -43,8 +44,6 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: NEXT_PUBLIC_SITE_URL
-        sync: false
-      - key: NEXT_PUBLIC_PARENT_URL
         sync: false
       - key: ALLOW_INDEXING
         value: "false"

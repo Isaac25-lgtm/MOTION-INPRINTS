@@ -9,8 +9,6 @@ const https = (v) => /^https:\/\//.test(v ?? "") && !/localhost/.test(v ?? "");
 
 if (!https(env.NEXT_PUBLIC_SITE_URL))
   blockers.push("NEXT_PUBLIC_SITE_URL is not a public https domain");
-if (!https(env.NEXT_PUBLIC_PARENT_URL))
-  blockers.push("NEXT_PUBLIC_PARENT_URL is not a public https domain");
 if (!env.NEXT_PUBLIC_CONTACT_PHONE && !env.NEXT_PUBLIC_CONTACT_EMAIL)
   blockers.push(
     "no verified public contact channel (NEXT_PUBLIC_CONTACT_PHONE or NEXT_PUBLIC_CONTACT_EMAIL)",

@@ -11,14 +11,14 @@ export function Footer() {
         <div className="site-footer__top">
           <div className="site-footer__brand">
             <Image
-              src="/brand/logo-trim.png"
-              alt="Motion Imprints"
+              src="/brand/logo-technologies.png"
+              alt="Motion Imprints Technologies"
               width={1466}
               height={596}
             />
             <p className="site-footer__statement">
-              {site.name}. {site.relationship}: systems, data and digital
-              platforms built around real work.
+              {site.name}: systems, data and digital platforms built around real
+              work.
             </p>
           </div>
           <nav aria-label="Solutions">
@@ -76,12 +76,6 @@ export function Footer() {
             {contact.address ? (
               <p className="site-footer__statement">{contact.address}</p>
             ) : null}
-            <p className="site-footer__heading" style={{ marginTop: 24 }}>
-              Parent company
-            </p>
-            <a className="site-footer__parent" href={site.parentUrl}>
-              {site.parentName} <span aria-hidden="true">↗</span>
-            </a>
           </div>
         </div>
         <div className="site-footer__legal">

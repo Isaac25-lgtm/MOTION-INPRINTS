@@ -24,12 +24,13 @@ export const hero = {
     position: "60% 50%",
   },
   tall: {
-    base: `${R}/hero/press-tall`,
+    // Phones: a square crop that keeps the whole hand, spatula and ink.
+    base: `${R}/hero/press-square`,
     widths: [1000, 700],
     width: 1000,
-    height: 1250,
-    alt: "Orange ink being worked onto the rollers of a printing press.",
-    position: "50% 40%",
+    height: 1000,
+    alt: "A hand working orange ink onto the rollers of a printing press.",
+    position: "50% 50%",
   },
 } satisfies Record<string, Frame>;
 
@@ -42,7 +43,7 @@ export type Service = {
 };
 
 // Branding, Signage and Packaging are mockups (licensed stock + the supplied
-// Motion logo). Apparel is unbranded licensed stock. None is Motion client work.
+// Motion logo). Apparel is a genuine, owner-approved Motion job.
 export const services: Service[] = [
   {
     area: "branding",
@@ -77,14 +78,14 @@ export const services: Service[] = [
     title: "Apparel and Merchandise",
     text: "Printed and embroidered garments, caps and promotional items.",
     href: "/services/corporate",
-    // kind: stock — unbranded finished garments, not a Motion job
+    // kind: genuine, owner-approved (IMG-20260921-WA0172.jpg)
     frame: {
-      base: `${R}/services/apparel-garments`,
+      base: `${R}/services/apparel-branded`,
       widths: [1400, 900, 560],
       width: 1400,
-      height: 1121,
-      alt: "Stacks of folded shirts sorted by size label.",
-      position: "45% 45%",
+      height: 1343,
+      alt: "White polo shirts and caps printed with the Friends of Boxing logo.",
+      position: "50% 50%",
     },
   },
   {

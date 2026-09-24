@@ -81,12 +81,7 @@ const organisation = {
   "@type": "Organization",
   name: site.name,
   url: site.url,
-  logo: `${site.url}/brand/logo-trim.png`,
-  parentOrganization: {
-    "@type": "Organization",
-    name: site.parentName,
-    url: site.parentUrl,
-  },
+  logo: `${site.url}/brand/logo-technologies.png`,
 };
 
 export default function HomePage() {
@@ -119,9 +114,9 @@ export default function HomePage() {
           <div className="hero__side">
             <p className="hero__we">We are {site.name}</p>
             <p>
-              The technology division of {site.parentName}. We design and build
-              the systems, platforms and digital marketing that health
-              facilities, programmes, SACCOs, schools and businesses run on.
+              We design and build the systems, platforms and digital marketing
+              that health facilities, programmes, SACCOs, schools and businesses
+              run on.
             </p>
             <Link className="more" href="/solutions">
               Explore our solutions
@@ -143,9 +138,8 @@ export default function HomePage() {
             Who we are
           </h2>
           <p className="statement">
-            {site.name} is the technology division of {site.parentName},
-            building health, M&amp;E, SACCO, school, retail and web systems for
-            organisations that run on records.
+            {site.name} builds health, M&amp;E, SACCO, school, retail and web
+            systems for organisations that run on records.
           </p>
           <p>
             We start with the work: how records move, who approves what, and
@@ -312,28 +306,28 @@ export default function HomePage() {
               From opening day to online
             </h2>
             <p className="statement">
-              One group can take a new business from its first sign to its first
+              We can take a new business from its first sale to its first
               customers online.
             </p>
           </div>
           <ol className="path__steps">
             <li>
               <span className="path__num">01</span>
-              <h3>{site.parentName}</h3>
+              <h3>Systems and point of sale</h3>
               <p>
-                Identity, stationery, signage, packaging and uniforms: the side
-                customers can touch.
+                The counter, the stock, the records and the reports: the systems
+                the business runs on from day one.
               </p>
-              <a className="more" href={site.parentUrl}>
-                Visit {site.parentName}
-              </a>
+              <Link className="more" href="/solutions/pos-retail">
+                Point of sale and retail
+              </Link>
             </li>
             <li className="dark">
               <span className="path__num">02</span>
-              <h3>{site.name}</h3>
+              <h3>Website and digital marketing</h3>
               <p>
-                Point of sale, business system, website and digital marketing:
-                the systems and the digital front door.
+                The website, the search and social profiles and the campaigns:
+                the digital front door that brings the first customers in.
               </p>
               <Link className="more" href="/solutions/digital-marketing">
                 Digital marketing for new businesses
@@ -354,8 +348,8 @@ export default function HomePage() {
             <span>Delivery stages on every project</span>
           </li>
           <li>
-            <b>2</b>
-            <span>Companies, one group</span>
+            <b>5</b>
+            <span>Sectors we build for</span>
           </li>
         </ul>
       </section>

@@ -7,12 +7,9 @@
 export const site = {
   name: "Motion Imprints Technologies",
   shortName: "Technologies",
-  parentName: "Motion Imprints",
-  relationship: "A technology division of Motion Imprints",
   description:
     "Motion Imprints Technologies designs and builds health, M&E, business, SACCO, school and retail systems, websites, digital marketing and analytics: systems built around real work.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001",
-  parentUrl: process.env.NEXT_PUBLIC_PARENT_URL ?? "http://localhost:3000",
 } as const;
 
 export type TechnologiesSiteConfig = typeof site;

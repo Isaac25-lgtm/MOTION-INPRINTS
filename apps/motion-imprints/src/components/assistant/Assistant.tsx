@@ -196,7 +196,23 @@ export function Assistant({
         onClick={show}
       >
         <span className="ask-launch__dot" aria-hidden="true" />
-        Ask Motion
+        <svg
+          className="ask-launch__icon"
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.6A.5.5 0 0 1 5 19.2V16h0a1 1 0 0 1-1-1V5.5Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="ask-launch__label">Ask Motion</span>
       </button>
       <dialog
         ref={dialogRef}

@@ -744,7 +744,7 @@ export const solutions: Solution[] = [
     summary:
       "For new businesses: get found, look credible online, turn attention into enquiries.",
     headline: "Digital marketing for businesses that have just opened",
-    lede: "Motion Imprints sets up the physical side of a new business: the sign, the cards, the packaging. We set up the digital side: the profiles, the content and the campaigns that bring the first customers through the door.",
+    lede: "A new business needs to be found before it can be chosen. We set up the digital side: the profiles, the content and the campaigns that bring the first customers through the door.",
     cta: "Plan Your Launch",
     visual: "marketing",
     problem:
@@ -788,7 +788,7 @@ export const solutions: Solution[] = [
           },
           {
             title: "Content",
-            text: "Photos, graphics and posts in your brand, produced with Motion Imprints.",
+            text: "Photos, graphics and posts in your brand, ready for every channel.",
           },
           {
             title: "Campaigns",

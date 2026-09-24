@@ -192,9 +192,12 @@ test("the homepage has no Technologies section; header and footer link out", () 
   assert.doesNotMatch(sections, /https?:\/\/(?!localhost)/);
 });
 
-test("the Apparel card shows finished garments, not a machine", () => {
+test("the Apparel card shows finished branded garments, not a machine or plain stock", () => {
   const content = read("src/content/homepage.ts");
-  assert.match(content, /apparel-garments/);
+  // Genuine, owner-approved Motion work: printed polo and caps.
+  assert.match(content, /apparel-branded/);
+  assert.match(content, /IMG-20260921-WA0172\.jpg/);
+  assert.doesNotMatch(content, /apparel-garments|folded shirts/);
   assert.doesNotMatch(content, /apparel-embroidery|sewing|embroidery machine/i);
 });
 

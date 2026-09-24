@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { primaryNav } from "@/lib/nav";
-import { site } from "@/lib/site";
 
 export function MobileNav() {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -66,9 +65,6 @@ export function MobileNav() {
               ))}
             </ul>
           </nav>
-          <a className="mobile-nav__parent" href={site.parentUrl}>
-            {site.parentName} <span aria-hidden="true">↗</span>
-          </a>
         </div>
       </dialog>
     </>

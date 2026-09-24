@@ -8,10 +8,9 @@ import {
 } from "@/components/Sections";
 import { Img } from "@/components/media/Img";
 import { photo } from "@/content/media";
-import { site } from "@/lib/site";
 
 const description =
-  "Motion Imprints Technologies is the technology division of Motion Imprints: systems, data and digital platforms built around real work.";
+  "Motion Imprints Technologies designs and builds systems, data and digital platforms around real work.";
 
 export const metadata: Metadata = {
   title: "About",
@@ -52,7 +51,7 @@ export default function AboutPage() {
       <Crumbs items={[{ label: "About" }]} />
       <PageBanner
         title="About Motion Imprints Technologies"
-        lede={`${site.relationship}. ${site.parentName} makes the physical side of a brand; we build the systems, data and digital platforms organisations run on.`}
+        lede="We design and build the systems, data and digital platforms that health facilities, programmes, SACCOs, schools and businesses run on."
         img={photo("who-we-are")}
         position="50% 30%"
       />
@@ -74,9 +73,9 @@ export default function AboutPage() {
             SACCOs, schools and businesses that need their records, workflows
             and reports to hold together.
           </p>
-          <a className="more" href={site.parentUrl}>
-            Visit {site.parentName}
-          </a>
+          <Link className="more" href="/solutions">
+            Explore our solutions
+          </Link>
         </div>
       </section>
 
@@ -96,38 +95,6 @@ export default function AboutPage() {
             </li>
           ))}
         </ol>
-      </section>
-
-      <section className="section section--grey" aria-labelledby="group">
-        <div className="container path">
-          <div>
-            <h2 id="group" className="title">
-              One group, two companies
-            </h2>
-            <p className="statement">Physical and digital, planned together.</p>
-          </div>
-          <ol className="path__steps">
-            <li>
-              <span className="path__num">01</span>
-              <h3>{site.parentName}</h3>
-              <p>Identity, print, signage, packaging and merchandise.</p>
-              <a className="more" href={site.parentUrl}>
-                Visit {site.parentName}
-              </a>
-            </li>
-            <li className="dark">
-              <span className="path__num">02</span>
-              <h3>{site.name}</h3>
-              <p>
-                Business systems, POS, websites, digital marketing, analytics
-                and sector systems.
-              </p>
-              <Link className="more" href="/solutions">
-                Explore solutions
-              </Link>
-            </li>
-          </ol>
-        </div>
       </section>
 
       <CtaBand

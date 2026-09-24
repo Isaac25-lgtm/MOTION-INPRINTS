@@ -46,9 +46,10 @@ database. The `inquiries` table records which site each message came from.
 ### Steps
 
 1. **Create the services.** In Render, choose **New → Blueprint** and pick this
-   repository. Render asks for four addresses: each site's own address and the other
-   site's address. Until the domains are connected, use the `onrender.com` addresses
-   (for example `https://motion-imprints.onrender.com`). Everything else below is
+   repository. Render asks for three addresses: each site's own address, plus the
+   Technologies address for the Motion Imprints "Technologies" link. Until the domains
+   are connected, use the `onrender.com` addresses (for example
+   `https://motion-imprints.onrender.com`). Everything else below is
    added later in each service's **Environment** tab, when you have it.
 
    Settings whose names start with `NEXT_PUBLIC_` are built into the pages, so after
@@ -64,8 +65,8 @@ database. The `inquiries` table records which site each message came from.
    then change:
    - `motion-imprints`: `NEXT_PUBLIC_SITE_URL` (its own domain) and
      `NEXT_PUBLIC_TECHNOLOGIES_URL` (the Technologies domain)
-   - `motion-technologies`: `NEXT_PUBLIC_SITE_URL` (its own domain) and
-     `NEXT_PUBLIC_PARENT_URL` (the Motion Imprints domain)
+   - `motion-technologies`: `NEXT_PUBLIC_SITE_URL` (its own domain). The
+     Technologies site stands on its own and does not link back.
 4. **Add contact details.** Add the `NEXT_PUBLIC_CONTACT_*` values on both services.
    Each channel appears only when it is set.
 5. **Optional extras:**

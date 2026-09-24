@@ -8,7 +8,6 @@ import {
   telHref,
   whatsappHref,
 } from "@/lib/contact";
-import { site } from "@/lib/site";
 
 const description =
   "Discuss a system, request a demonstration or ask for a quotation from Motion Imprints Technologies.";
@@ -102,13 +101,6 @@ export default async function ContactPage({ searchParams }: Props) {
                 <li key={n}>{n}</li>
               ))}
             </ol>
-          </div>
-          <div className="contact__card contact__card--navy dark">
-            <p className="kicker">Print, signage or branding?</p>
-            <p>Those are made by {site.parentName}, our parent company.</p>
-            <a className="more" href={`${site.parentUrl}/contact`}>
-              Contact {site.parentName} <span aria-hidden="true">↗</span>
-            </a>
           </div>
         </aside>
       </div>

@@ -350,3 +350,42 @@
     font-size: 0.88rem;
   }
 }
+
+.ask-launch__icon {
+  display: none;
+}
+
+/* Phones: a compact round button, so it covers as little content as possible.
+   The accessible name stays "Ask Motion" (the label is hidden visually only),
+   and the footer gains room so its last line can scroll clear of the button. */
+@media (max-width: 700px) {
+  .ask-launch {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    justify-content: center;
+    width: 48px;
+    min-height: 48px;
+    padding: 0;
+  }
+
+  .ask-launch__dot {
+    display: none;
+  }
+
+  .ask-launch__icon {
+    display: block;
+  }
+
+  .ask-launch__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .site-footer {
+    padding-bottom: calc(28px + 64px);
+  }
+}
