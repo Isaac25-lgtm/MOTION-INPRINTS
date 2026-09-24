@@ -735,3 +735,37 @@ a.home-card {
     font-size: 0.9rem;
   }
 }
+
+/* ------------------------------------------------- capability rail, placed */
+
+/* Larger screens with motion: the rail runs across the bottom of the hero
+   photograph instead of sitting on its own black band. The hero reserves the
+   rail's height below the buttons, and the photograph's own dark lower edge
+   (plus a soft fade) carries the white words. */
+@media (min-width: 701px) and (prefers-reduced-motion: no-preference) {
+  .home-hero__copy {
+    padding-bottom: calc(clamp(40px, 6vh, 72px) + 112px);
+  }
+
+  .home-rail {
+    z-index: 2;
+    margin-top: -112px;
+    border-top: 1px solid rgba(246, 242, 234, 0.14);
+    background: linear-gradient(
+      0deg,
+      rgba(8, 11, 16, 0.62) 0%,
+      rgba(8, 11, 16, 0.4) 60%,
+      rgba(8, 11, 16, 0.18) 100%
+    );
+  }
+}
+
+/* Phones, and anyone who prefers reduced motion: a light rail on paper,
+   between hairlines, continuing the page rather than a dark slab. */
+@media (max-width: 700px), (prefers-reduced-motion: reduce) {
+  .home-rail {
+    border-block: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+  }
+}
