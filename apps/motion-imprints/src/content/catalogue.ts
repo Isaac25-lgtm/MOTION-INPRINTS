@@ -13,9 +13,9 @@ import { getWorkItem } from "./work";
  *
  * Pictures are genuine, owner-approved pieces from the Motion archive, shown
  * as examples of the product type. Where no good genuine photograph exists
- * (mugs, wayfinding plates) a licensed stock photograph of a plain, unbranded
- * item stands in; product-media.json records its source and licence. Stock
- * never appears in Work.
+ * (mugs, paper bags, wayfinding signs) a licensed stock photograph of a plain,
+ * unbranded item stands in; product-media.json records its source and licence.
+ * Stock never appears in Work.
  */
 
 export type ProductCategory =
@@ -864,7 +864,10 @@ export const products: Product[] = [
     ],
     unit: "bags",
     service: "packaging",
-    image: workImage("branded-carrier-bags"),
+    image: productImage(
+      "paper-bags",
+      "A plain white paper carrier bag with twisted rope handles.",
+    ),
   }),
 ];
 

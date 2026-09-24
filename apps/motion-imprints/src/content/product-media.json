@@ -82,5 +82,14 @@
     "widths": [1400, 900, 560],
     "width": 1400,
     "height": 1750
+  },
+  "paper-bags": {
+    "source": "Pexels 25533249",
+    "licence": "Pexels License",
+    "licenceUrl": "https://www.pexels.com/license/",
+    "sourceUrl": "https://www.pexels.com/photo/25533249/",
+    "widths": [1400, 900, 560],
+    "width": 1400,
+    "height": 1750
   }
 }
