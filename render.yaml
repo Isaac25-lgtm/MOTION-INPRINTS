@@ -1,6 +1,15 @@
-# Render Blueprint: two independent web services from this workspace.
-# Secrets are declared with sync: false and entered in the Render dashboard;
-# nothing secret is committed. See docs/execution/13-production-hardening.md.
+# Render Blueprint: two independent web services from this workspace, one per
+# domain. The Blueprint asks only for each site's public address and the other
+# site's address (for the cross-links); they stay editable in the dashboard.
+#
+# Optional settings are added later in each service's Environment tab when the
+# owner has them; nothing secret is ever committed. The code works without
+# them. See README.md and each app's .env.example:
+#   DATABASE_URL                   Neon pooled string, same on both services
+#   NEXT_PUBLIC_CONTACT_PHONE / _WHATSAPP / _EMAIL / _ADDRESS / _HOURS
+#   NEXT_PUBLIC_CONTACT_MAP_URL    (Motion Imprints only)
+#   MOTION_ASSISTANT_API_KEY       live answers from the Ask Motion assistant
+#   NOTIFY_WEBHOOK_URL             staff notification for each new request
 services:
   - type: web
     name: motion-imprints
@@ -20,24 +29,6 @@ services:
         sync: false
       - key: ALLOW_INDEXING
         value: "false"
-      - key: DATABASE_URL
-        sync: false
-      - key: NOTIFY_WEBHOOK_URL
-        sync: false
-      - key: MOTION_ASSISTANT_API_KEY
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_PHONE
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_WHATSAPP
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_EMAIL
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_ADDRESS
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_HOURS
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_MAP_URL
-        sync: false
       - key: TRUSTED_PROXY_HOPS
         value: "1"
 
@@ -57,21 +48,5 @@ services:
         sync: false
       - key: ALLOW_INDEXING
         value: "false"
-      - key: DATABASE_URL
-        sync: false
-      - key: NOTIFY_WEBHOOK_URL
-        sync: false
-      - key: MOTION_ASSISTANT_API_KEY
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_PHONE
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_WHATSAPP
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_EMAIL
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_ADDRESS
-        sync: false
-      - key: NEXT_PUBLIC_CONTACT_HOURS
-        sync: false
       - key: TRUSTED_PROXY_HOPS
         value: "1"
